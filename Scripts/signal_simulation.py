@@ -1,50 +1,46 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 
 # Parameters
-F_S = 10e6 # Sampling or ADC frequency (10 MHz)
+
+'''
+F_SAMPLING = 10e6 # Sampling or ADC frequency (10 MHz)
 F_SIGNAL = 10e3 # Signal frequency (10 kHz)
-DURATION = 1 # Signal duration in seconds
+NOISE_POWER = 0.1 # Noise power level
+WINDOW_SIZE = 500
+'''
+
+F_SAMPLING = 1e4
+F_SIGNAL = 100
+NOISE_POWER = 0.1
+WINDOW_SIZE = 500
 
 # Discrete time points vector
-t = np.arange(0, DURATION, 1/F_S)
+t = np.arange(0, WINDOW_SIZE) / F_SAMPLING
 
-# Generate RF signal (sine wave)
-signal = np.sin(2 * np.pi * F_SIGNAL * t)
+# Initialize figure
+fig, ax = plt.subplots()
+line, = ax.plot(t, np.zeros_like(t), label="Noisy Signal")
+ax.set_ylim(-1.5, 1.5) # Adjust based on signal strength
+ax.set_xlim(0, WINDOW_SIZE / F_SAMPLING)
+ax.set_xlabel("Time (s)")
+ax.set_ylabel("Amplitude")
+ax.legend()
+ax.set_title("Real-Time Noisy Signal")
 
-# Generate cosmic noise (Gaussian noise for now)
-# TODO: Look into whether this value actually makes sense?
-# Increasing the noise_power generates more intense noise
-noise_power = 0.1
-noise = np.random.normal(0, np.sqrt(noise_power), len(t))
+def update(frame):
+    # Generate new signal and noise
+    signal = np.sin(2 * np.pi * F_SIGNAL * (frame + np.arange(WINDOW_SIZE)) / F_SAMPLING)
+    noise = np.random.normal(0, np.sqrt(NOISE_POWER), WINDOW_SIZE)
+    noisy_signal = signal + noise
+    print(frame)
 
-# Noisy signal
-noisy_signal = signal + noise
+    # Update plot data
+    line.set_ydata(noisy_signal)
+    return line,
 
-# Calculate power levels
-signal_power = np.mean(signal**2)
-noise_power = np.mean(noise**2)
+# Create animation
+ani = animation.FuncAnimation(fig, update, interval=50, blit=True)
 
-# Compute SNR in dB
-SNR_dB = 10 * np.log10(signal_power / noise_power)
-print(f"SNR: {SNR_dB:.2f} dB")
-
-# Plot results
-# TODO: Do we want to increase the viewing window?
-plt.figure(figsize=(10, 5))
-plt.plot(t[:10000], signal[:10000], label="Clean signal")
-plt.plot(t[:10000], noisy_signal[:10000], label="Noisy Signal", alpha=0.7)
-plt.xlabel("Time (s)")
-plt.ylabel("Amplitude")
-plt.legend()
-plt.title("Signal with Cosmic Noise")
 plt.show()
-
-'''
-TODO: Next steps: continuously streaming in a while loop
-- Make it real-time
-- Signal plot being updated as you go
-- Live plot and then write values to a txt and then integrate with OpenAI gym
-- Have multiple sets of randomized signal data
-- Real-time plotting and printing to a file
-'''
