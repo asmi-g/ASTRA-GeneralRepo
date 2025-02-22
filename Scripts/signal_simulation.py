@@ -1,12 +1,14 @@
 # TO DO:
 # - Verify cosmic noise model is accurate
+# - Validate data somehow
 # - Add in the ability to save ADC streaming data to csv 
 
 # CHANGES:
 # - X plot now updates w/ time
 # - Signal data now converted to ADC values
 # - "Real-time" ADC stream of data added (as opposed to an array of values)
-# - Integrate cosmic noise model
+# - Integrated cosmic noise model
+# - Both noisy and clean/ground truth signal ADC streams added
 
 
 import numpy as np
@@ -43,8 +45,10 @@ x_axis = []
 y_axis_noisy = []
 y_axis_clean = []
 
-# ADC Stream Data Buffer
-adc_stream = np.zeros(WINDOW_SIZE)  # Initialize ADC value buffer
+# ADC Stream Data Buffers
+adc_noise_stream = np.zeros(WINDOW_SIZE)  # Initialize ADC value buffer for noisy signal samples
+adc_clean_stream = np.zeros(WINDOW_SIZE)  # Initialize ADC value buffer for clean signal samples
+
 
 
 # Initialize figure
@@ -108,7 +112,7 @@ def generate_pink_noise(size, white_noise):
 
 def update(frame):
     # Track the time as frames are updated
-    global current_time, x_axis, y_axis_noisy, y_axis_clean, adc_stream
+    global current_time, x_axis, y_axis_noisy, y_axis_clean, adc_noise_stream, adc_clean_stream
 
     # Generate new signal and noise, which consist of both, white and pink noise
     signal = np.sin(2 * np.pi * F_SIGNAL * (frame + np.arange(WINDOW_SIZE)) / F_SAMPLING)
@@ -122,16 +126,29 @@ def update(frame):
     # Convert ADC to voltage
     quantized_signal = (adc_values / (2**ADC_BITS - 1)) * V_REF - V_REF / 2
     
-    # ADC DATA STREAM VALUE: SINGLE SAMPLE
-    sample = noisy_signal[frame % WINDOW_SIZE]
+    # ADC DATA STREAM VALUE: SINGLE SAMPLE, NOISY DATA
+    noisy_sample = noisy_signal[frame % WINDOW_SIZE]
     # Convert to ADC value
-    adc_datastream_val = convert_ADC_stream(sample)
-    print("Time", current_time/10000, "Streaming ADC Value:", adc_datastream_val)
+    adc_noisy_datastream_val = convert_ADC_stream(noisy_sample)
+    print("Time", current_time/10000, "Streaming NOISY ADC Value:", adc_noisy_datastream_val)
     # Convert ADC value to voltage 
-    quantized_datastream_signal = (adc_datastream_val / (2**ADC_BITS - 1)) * V_REF - V_REF / 2
+    quantized_noisy_datastream_signal = (adc_noisy_datastream_val / (2**ADC_BITS - 1)) * V_REF - V_REF / 2
     # Shift data buffer
-    adc_stream = np.roll(adc_stream, -1)  # Shift left by one
-    adc_stream[-1] = quantized_datastream_signal  # Add the new value
+    adc_noise_stream = np.roll(adc_noise_stream, -1)  # Shift left by one
+    adc_noise_stream[-1] = quantized_noisy_datastream_signal  # Add the new value
+
+
+    # ADC DATA STREAM VALUE: SINGLE SAMPLE, CLEAN DATA
+    clean_sample = signal[frame % WINDOW_SIZE]
+    # Convert to ADC value
+    adc_clean_datastream_val = convert_ADC_stream(clean_sample)
+    print("Time", current_time/10000, "Streaming CLEAN ADC Value:", adc_clean_datastream_val)
+    # Convert ADC value to voltage 
+    quantized_clean_datastream_signal = (adc_clean_datastream_val / (2**ADC_BITS - 1)) * V_REF - V_REF / 2
+    # Shift data buffer
+    adc_clean_stream = np.roll(adc_clean_stream, -1)  # Shift left by one
+    adc_clean_stream[-1] = quantized_clean_datastream_signal  # Add the new value
+    
 
 
     # Update the time vector to shift with the data
