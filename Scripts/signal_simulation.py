@@ -1,11 +1,13 @@
 # TO DO:
-# - Integrate cosmic noise model
+# - Verify cosmic noise model is accurate
 # - Add in the ability to save ADC streaming data to csv 
 
 # CHANGES:
 # - X plot now updates w/ time
 # - Signal data now converted to ADC values
 # - "Real-time" ADC stream of data added (as opposed to an array of values)
+# - Integrate cosmic noise model
+
 
 import numpy as np
 import matplotlib.pyplot as plt
