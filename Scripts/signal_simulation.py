@@ -47,7 +47,7 @@ adc_stream = np.zeros(WINDOW_SIZE)  # Initialize ADC value buffer
 # Initialize figure
 fig, ax = plt.subplots()
 line, = ax.plot([], [], label="Noisy Signal")
-ax.set_ylim(-1.5, 1.5) # Adjust based on signal strength
+ax.set_ylim(-2.5, 2.5) # Adjust based on signal strength
 ax.set_xlim(0, WINDOW_SIZE / F_SAMPLING)
 ax.set_xlabel("Time (s)")
 ax.set_ylabel("Amplitude")
@@ -84,14 +84,31 @@ def convert_ADC_stream(signal):
     adc_value = np.clip(np.round(normalized_signal * (2**ADC_BITS - 1)), 0, 2**ADC_BITS - 1)
     return int(adc_value)  
 
+def generate_pink_noise(size, white_noise):
+    # Uses the Voss-McCartney Algorithm to generate pink noise
+    # Create a filter to shape the noise into pink noise
+    freq = np.fft.fftfreq(size)
+    # 1/f power law filter, according to cosmic noise documentation
+    pink_filter = np.sqrt(np.abs(freq))  
+    
+    # Apply the filter in the frequency domain
+    spectrum = np.fft.fft(white_noise/np.sqrt(NOISE_POWER))
+    spectrum *= pink_filter
+    
+    pink_noise = np.fft.ifft(spectrum)
+    return np.real(pink_noise)
+
+
+
 def update(frame):
     # Track the time as frames are updated
     global current_time, x_axis, y_axis, adc_stream
 
-    # Generate new signal and noise
+    # Generate new signal and noise, which consist of both, white and pink noise
     signal = np.sin(2 * np.pi * F_SIGNAL * (frame + np.arange(WINDOW_SIZE)) / F_SAMPLING)
-    noise = np.random.normal(0, np.sqrt(NOISE_POWER), WINDOW_SIZE)
-    noisy_signal = signal + noise
+    white_noise = np.random.normal(0, np.sqrt(NOISE_POWER), WINDOW_SIZE)
+    pink_noise = generate_pink_noise(WINDOW_SIZE, white_noise) * np.sqrt(NOISE_POWER)
+    noisy_signal = signal + pink_noise + white_noise
 
     # ADC ARRAY: PLOT
     # Convert to ADC values
