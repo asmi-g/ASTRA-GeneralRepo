@@ -40,7 +40,8 @@ V_REF = 5
 # Add in time counter, to track and update in plot
 current_time = 0
 x_axis = []
-y_axis = []
+y_axis_noisy = []
+y_axis_clean = []
 
 # ADC Stream Data Buffer
 adc_stream = np.zeros(WINDOW_SIZE)  # Initialize ADC value buffer
@@ -48,7 +49,10 @@ adc_stream = np.zeros(WINDOW_SIZE)  # Initialize ADC value buffer
 
 # Initialize figure
 fig, ax = plt.subplots()
-line, = ax.plot([], [], label="Noisy Signal")
+line_noisy, = ax.plot([], [], label="Noisy Signal", color='blue')
+line_clean, = ax.plot([], [], label="Clean Signal", color='red')
+
+
 ax.set_ylim(-2.5, 2.5) # Adjust based on signal strength
 ax.set_xlim(0, WINDOW_SIZE / F_SAMPLING)
 ax.set_xlabel("Time (s)")
@@ -59,7 +63,7 @@ ax.set_ylabel("Amplitude")
 legend = ax.legend(loc='upper right')
 legend.set_draggable(False)  # Prevents moving when updated
 
-ax.set_title("Real-Time Noisy Signal")
+ax.set_title("Real-Time Simulated Signal")
 
 def calculate_SNR(signal, noise):
     # Calculate power levels
@@ -104,7 +108,7 @@ def generate_pink_noise(size, white_noise):
 
 def update(frame):
     # Track the time as frames are updated
-    global current_time, x_axis, y_axis, adc_stream
+    global current_time, x_axis, y_axis_noisy, y_axis_clean, adc_stream
 
     # Generate new signal and noise, which consist of both, white and pink noise
     signal = np.sin(2 * np.pi * F_SIGNAL * (frame + np.arange(WINDOW_SIZE)) / F_SAMPLING)
@@ -133,15 +137,18 @@ def update(frame):
     # Update the time vector to shift with the data
     new_time = (current_time + np.arange(WINDOW_SIZE)) / F_SAMPLING
     x_axis.extend(new_time)
-    y_axis.extend(quantized_signal)
+    y_axis_noisy.extend(quantized_signal)
+    y_axis_clean.extend(signal)
     current_time += WINDOW_SIZE  # Move forward in time
 
     # Update plot data
-    line.set_data(x_axis[-WINDOW_SIZE:],y_axis[-WINDOW_SIZE:])
+    line_clean.set_data(x_axis[-WINDOW_SIZE:], y_axis_clean[-WINDOW_SIZE:])
+    line_noisy.set_data(x_axis[-WINDOW_SIZE:], y_axis_noisy[-WINDOW_SIZE:])
 
     # Adjust the x-axis limits to show the time passed
     ax.set_xlim(x_axis[-WINDOW_SIZE], x_axis[-1])
-    return line,
+    return line_clean, line_noisy
+
 
 # Create animation
 ani = animation.FuncAnimation(fig, update, interval=50, blit=False)
