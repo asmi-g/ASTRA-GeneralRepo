@@ -1,7 +1,12 @@
 # ASTRA-GeneralRepo
 
-Directory Structure
+This is a collection of software written for UW ASTRA, a project under the University of Waterloo Space Research team, for its signal analysis stratospheric balloon payload. This project repository contains code for the Reinforcement Learning agent, as well as general purpose scripts, created as part of the CANSBX7 submission on behalf of UW ASTRA.
 
--> RL-EnvConfig: Custom OpenAI Gym environment, template repo at the moment
+- **/RL-EnvConfig**
+  - This folder contains a repository, for an OpenAI Gym Reinforcement Learning Agent, made for the purpose of creating and testing a custom environment.
+- **/Scripts**
+  - This folder contains general purpose scripts, performing tasks like: signal simulation & data generation, Software Defined Radio (SDR) operations, and some intermediate scripts for debugging and testing purposes .
 
--> Scripts: General purpose scripts
+#### Software Architecture
+![alt text](Integrated-SW-HW-Architecture.png)
+
