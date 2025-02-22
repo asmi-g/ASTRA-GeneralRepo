@@ -59,6 +59,18 @@ legend.set_draggable(False)  # Prevents moving when updated
 
 ax.set_title("Real-Time Noisy Signal")
 
+def calculate_SNR(signal, noise):
+    # Calculate power levels
+    signal_power = np.mean(signal**2)
+    noise_power = np.mean(noise**2)
+
+    # Compute SNR in dB
+    SNR_dB = 10 * np.log10(signal_power / noise_power)
+    # print(f"SNR: {SNR_dB:.2f} dB")
+
+    return SNR_dB 
+   
+
 def convert_ADC_array(signal):
     # Normalize incoming signal to a range of 0 to reference voltage (5)
     # Assumes the input signal range is from -V_REF/2, to +V_REF/2
