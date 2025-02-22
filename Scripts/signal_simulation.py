@@ -1,7 +1,7 @@
 # TO DO:
 # - Verify cosmic noise model is accurate
 # - Validate data somehow
-# - Add in the ability to save ADC streaming data to csv 
+# - Save data according to the # of data points we want
 
 # CHANGES:
 # - X plot now updates w/ time
@@ -9,11 +9,13 @@
 # - "Real-time" ADC stream of data added (as opposed to an array of values)
 # - Integrated cosmic noise model
 # - Both noisy and clean/ground truth signal ADC streams added
+# - Added in the ability to save ADC streaming data to csv 
 
 
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
+import pandas as pd
 
 # Signal Parameters
 
@@ -38,6 +40,10 @@ V_REF = 5V    # Reference Voltage, 5V
 '''
 ADC_BITS = 12 
 V_REF = 5
+
+# Save CSV to the Data folder outside of Scripts
+data_path = '../Data/signal_data.csv'  # ../ goes up one directory
+
 
 # Add in time counter, to track and update in plot
 current_time = 0
@@ -161,6 +167,16 @@ def update(frame):
     # Update plot data
     line_clean.set_data(x_axis[-WINDOW_SIZE:], y_axis_clean[-WINDOW_SIZE:])
     line_noisy.set_data(x_axis[-WINDOW_SIZE:], y_axis_noisy[-WINDOW_SIZE:])
+
+
+    # Save to csv
+    df = pd.DataFrame({
+    'Time': x_axis[-WINDOW_SIZE:], 
+    'Noisy Signal':  adc_noisy_datastream_val, 
+    'Clean Signal': adc_clean_datastream_val
+    })
+
+    df.to_csv(data_path, mode='a', index=False, header=not pd.io.common.file_exists(data_path))
 
     # Adjust the x-axis limits to show the time passed
     ax.set_xlim(x_axis[-WINDOW_SIZE], x_axis[-1])
