@@ -42,7 +42,7 @@ ADC_BITS = 12
 V_REF = 5
 
 # Save CSV to the Data folder outside of Scripts
-data_path = '../Data/signal_data.csv'  # ../ goes up one directory
+data_path = '../Data/simulated_signal_data.csv'  # ../ goes up one directory
 
 
 # Add in time counter, to track and update in plot
