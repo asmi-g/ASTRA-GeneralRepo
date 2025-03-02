@@ -1,4 +1,5 @@
 # TO DO:
+# - Verify w/ both filters
 # - Verify cosmic noise model is accurate
 # - Validate data somehow
 # - Save data according to the # of data points we want

@@ -9,6 +9,7 @@ This is a collection of software written for UW ASTRA, a project under the Unive
 - **/Scripts**
   - This folder contains general purpose scripts, performing tasks like: signal simulation & data generation, Software Defined Radio (SDR) operations, and some intermediate scripts for debugging and testing purposes .
 
-#### Software Architecture
+#### Software Architecture - OUTDATED
+Note: Servo Motor & Sun Sensors no longer being used
 ![alt text](Integrated-SW-HW-Architecture.png)
 
