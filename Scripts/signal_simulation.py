@@ -1,6 +1,8 @@
 # TO DO:
-# - Verify w/ both filters
+# - Look into how encoding might change wave
+# - Verify w/ both filters: Wavelet Denoising and EMD
 # - Verify cosmic noise model is accurate
+# - Verify burst is accurate (i.e, amplitude and duration)
 # - Validate data somehow
 # - Save data according to the # of data points we want
 
@@ -11,6 +13,7 @@
 # - Integrated cosmic noise model
 # - Both noisy and clean/ground truth signal ADC streams added
 # - Added in the ability to save ADC streaming data to csv 
+# - Added in burst noise function
 
 
 import numpy as np
@@ -115,6 +118,16 @@ def generate_pink_noise(size, white_noise):
     pink_noise = np.fft.ifft(spectrum)
     return np.real(pink_noise)
 
+def add_burst(signal, burst_probability=0.01, burst_amplitude=3.0, burst_duration=10):
+    # Add in random bursts of noise
+    noisy_signal = signal.copy()
+    for i in range(len(signal)):
+        if np.random.rand() < burst_probability:
+            burst_start = i
+            # Add burst noise at random interval and amplitude
+            burst_end = min(i + burst_duration, len(signal))
+            noisy_signal[burst_start:burst_end] += np.random.uniform(-burst_amplitude, burst_amplitude)
+    return noisy_signal
 
 
 def update(frame):
@@ -125,7 +138,7 @@ def update(frame):
     signal = np.sin(2 * np.pi * F_SIGNAL * (frame + np.arange(WINDOW_SIZE)) / F_SAMPLING)
     white_noise = np.random.normal(0, np.sqrt(NOISE_POWER), WINDOW_SIZE)
     pink_noise = generate_pink_noise(WINDOW_SIZE, white_noise) * np.sqrt(NOISE_POWER)
-    noisy_signal = signal + pink_noise + white_noise
+    noisy_signal = add_burst(signal) + pink_noise + white_noise
 
     # ADC ARRAY: PLOT
     # Convert to ADC values
