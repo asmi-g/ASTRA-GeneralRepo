@@ -1,6 +1,6 @@
 # TO DO:
 # - Look into how encoding might change wave
-# - Verify w/ both filters: Wavelet Denoising and EMD
+# - Verify w/ Wavelet Denoising
 # - Verify cosmic noise model is accurate
 # - Verify burst is accurate (i.e, amplitude and duration)
 # - Validate data somehow
