@@ -1,0 +1,23 @@
+name: conda_env
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - numpy
+  - scipy
+  - gym
+  - gymnasium
+  - stable-baselines3
+  - matplotlib
+  - pandas
+  - pygame
+  - cmake
+  - make
+  - clang
+  - clangxx
+  - libcxx
+  - hackrf
+  - pip
+  # - pip:
+  #     - some-custom-package  # (If you have pip-only dependencies)
