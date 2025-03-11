@@ -3,6 +3,7 @@
 # =====================
 
 # === Conda Environment ===
+miniconda.sh
 rl_env/
 *.conda
 *.env
