@@ -45,8 +45,10 @@ V_REF = 5V    # Reference Voltage, 5V
 ADC_BITS = 12 
 V_REF = 5
 
+
 # Save CSV to the Data folder outside of Scripts
 data_path = '../Data/simulated_signal_data.csv'  # ../ goes up one directory
+
 
 
 # Add in time counter, to track and update in plot
@@ -134,6 +136,7 @@ def update(frame):
     # Track the time as frames are updated
     global current_time, x_axis, y_axis_noisy, y_axis_clean, adc_noise_stream, adc_clean_stream
 
+
     # Generate new signal and noise, which consist of both, white and pink noise
     signal = np.sin(2 * np.pi * F_SIGNAL * (frame + np.arange(WINDOW_SIZE)) / F_SAMPLING)
     white_noise = np.random.normal(0, np.sqrt(NOISE_POWER), WINDOW_SIZE)
@@ -182,16 +185,13 @@ def update(frame):
     line_clean.set_data(x_axis[-WINDOW_SIZE:], y_axis_clean[-WINDOW_SIZE:])
     line_noisy.set_data(x_axis[-WINDOW_SIZE:], y_axis_noisy[-WINDOW_SIZE:])
 
-
     # Save to csv
     df = pd.DataFrame({
-    'Time': x_axis[-WINDOW_SIZE:], 
-    'Noisy Signal':  adc_noisy_datastream_val, 
-    'Clean Signal': adc_clean_datastream_val
+                    'Time': x_axis[-1:], 
+                    'Noisy Signal':  adc_noisy_datastream_val, 
+                    'Clean Signal': adc_clean_datastream_val
     })
-
     df.to_csv(data_path, mode='a', index=False, header=not pd.io.common.file_exists(data_path))
-
     # Adjust the x-axis limits to show the time passed
     ax.set_xlim(x_axis[-WINDOW_SIZE], x_axis[-1])
     return line_clean, line_noisy
