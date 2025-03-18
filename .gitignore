@@ -9,6 +9,10 @@ rl_env/
 *.env
 *.venv
 
+iuq_env/
+*.conda
+*.env
+
 # === Compiled C++ Binaries ===
 *.o
 *.out

@@ -1,26 +1,42 @@
-# not tested yet
-
-import gym
-from stable_baselines3 import DQN  # or any other algorithm (e.g., DQN, A2C)
+import gymnasium as gym
 import numpy as np
+from stable_baselines3 import DQN
+from stable_baselines3.common.env_util import make_vec_env
+from stable_baselines3.common.evaluation import evaluate_policy
+import matplotlib.pyplot as plt
 from astra_rev1.envs import NoiseReductionEnv
 
-# Create the environment
-env = gym.make("NoiseReductionEnv-v0")
+# Create environment
+env = NoiseReductionEnv()
 
-# Instantiate the model
+# Wrap environment in vectorized wrapper (for compatibility)
+vec_env = make_vec_env(lambda: env, n_envs=1)
+#'''
 model = DQN("MlpPolicy", env, verbose=1)
+model.learn(total_timesteps=10000, log_interval=4)
+model.save("dqn_noise_reduction")
+#'''
 
-# Train the model
-model.learn(total_timesteps=10000)
+# Load trained model (optional)
+model = DQN.load("dqn_noise_reduction", env=env)
 
-# Test the trained model
-state = env.reset()
-for i in range(10):
-    action, _states = model.predict(state, deterministic=True)
-    state, reward, done, info = env.step(action)
-    print(f"Step {i+1} | Action: {action} | Reward: {reward:.4f} | Done: {done}")
+# Evaluate the trained agent
+mean_reward, std_reward = evaluate_policy(model, env, n_eval_episodes=10)
+print(f"Mean reward: {mean_reward}, Std reward: {std_reward}")
+
+# Run a test episode to visualize results
+obs, _ = env.reset()
+rewards = []
+for _ in range(100):
+    action, _states = model.predict(obs, deterministic=True)
+    next_state, reward, done, truncated, info = env.step(action)
+    rewards.append(reward)
     if done:
-        state = env.reset()
+        break
 
-env.close()
+# Plot reward progression
+plt.plot(rewards)
+plt.xlabel("Step")
+plt.ylabel("Reward")
+plt.title("DQN Reward Progression in Noise Reduction")
+plt.show()
