@@ -13,7 +13,7 @@ clean_signal = []
 
 # Read in noisy signal data from csv
 # TODO: Can do this with pandas
-with open('Data/simulated_signal_data.csv') as signal_data_csv:
+with open('../Data/simulated_signal_data.csv') as signal_data_csv:
     signal_data_reader = csv.reader(signal_data_csv, delimiter=',')
     
     # Skipping header
