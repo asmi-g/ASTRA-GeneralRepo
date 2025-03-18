@@ -11,7 +11,7 @@ V_REF = 5    # Reference voltage
 
 # Sample parameters 
 fs = 10000
-data_path = 'C:/Users/asmig/design-team-work/ASTRA-GeneralRepo/Data/simulated_signal_data.csv'
+data_path = '../Data/simulated_signal_data.csv'
 
 def read_noisy_data(file_path):
     """Reads the noisy voltage values from CSV"""
