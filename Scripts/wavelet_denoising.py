@@ -1,47 +1,58 @@
-import csv
+import pandas as pd
 import pywt
+import numpy as np
 import matplotlib.pyplot as plt
 
-# Constants
-THRESHOLD = 2
-WAVELET = 'db4'
+class WaveletDenoiser:
+    def __init__(self, path_to_signal_data, wavelet, threshold_mode='soft', level=0, threshold=0):
+        self.wavelet = wavelet
+        self.threshold_mode = threshold_mode
+        self.threshold = threshold
+        self.level = level
+        self.signal_data_frame = pd.read_csv(path_to_signal_data)
+        self.denoised_signal = None
 
-# Globals
-time = []
-noisy_signal = []
-clean_signal = []
-
-# Read in noisy signal data from csv
-# TODO: Can do this with pandas
-with open('Data/simulated_signal_data.csv') as signal_data_csv:
-    signal_data_reader = csv.reader(signal_data_csv, delimiter=',')
+    def __apply_wavelet_transform(self, noisy_signal):
+        if self.level:
+            coeffs = pywt.wavedec(noisy_signal, self.wavelet, level=self.level)
+        else:
+            coeffs = pywt.dwt(noisy_signal, self.wavelet)
+        return coeffs
     
-    # Skipping header
-    next(signal_data_reader)
+    def denoise_signal(self):
+        noisy_signal = self.signal_data_frame["Noisy Signal"].values
+        coeffs = self.__apply_wavelet_transform(noisy_signal)
+        if not self.threshold:
+            # Donoho and Silverman Universal Threshold
+            sigma = np.median(np.abs(coeffs[-1])) / 0.6745 
+            self.threshold = sigma * np.sqrt(2 * np.log(len(noisy_signal)))
+        coeffs[1:] = [pywt.threshold(c, self.threshold, mode=self.threshold_mode) for c in coeffs[1:]]
+        self.denoised_signal = pywt.waverec(coeffs, self.wavelet)
+    
+    def plot(self):
+        plt.figure(figsize=(12, 6))
+        plt.plot(self.signal_data_frame["Time"], self.signal_data_frame["Noisy Signal"].values, label="Noisy Signal", linestyle="dashed", alpha=0.4, color='red')
+        plt.plot(self.signal_data_frame["Time"], self.denoised_signal, label="Denoised Signal (Multi-Level, Hard Threshold)", linewidth=2, color='blue')
+        plt.plot(self.signal_data_frame["Time"], self.signal_data_frame["Clean Signal"].values, label="Clean Signal (Reference)", linestyle="dotted", linewidth=2, color='green')
 
-    # Reading in data
-    for i, row in enumerate(signal_data_reader):
-        if i >= 2000:
-            break
-        time.append(row[0])
-        noisy_signal.append(row[1])
-        clean_signal.append(row[2])
+        plt.legend()
+        plt.title("Wavelet Denoising")
+        plt.xlabel("Time")
+        plt.ylabel("Signal Amplitude")
+        plt.grid()
+        plt.show()
 
-# Apply wavelet transform and obtain coefficients
-coeffs = pywt.dwt(noisy_signal, WAVELET)
+def main():
+    waveletDenoiser = WaveletDenoiser('data/simulated_signal_data.csv', 'db4', 'soft', 4)
+    waveletDenoiser.denoise_signal()
+    waveletDenoiser.plot()
 
-# Apply soft thresholding
-denoised_coeffs = [pywt.threshold(c, THRESHOLD, mode='soft') for c in coeffs]
+if __name__ == "__main__":
+    main()
 
-# Reconstruct the signal
-denoised_signal = pywt.idwt(denoised_coeffs[0], denoised_coeffs[1], WAVELET)
 
-# Plot results
-plt.figure(figsize=(10, 6))
-plt.plot(time, noisy_signal, label='Noisy Signal')
-plt.plot(time, denoised_signal, label='Denoised Signal')
-plt.plot(time, clean_signal, label='Original Signal')
-plt.autoscale()
-plt.legend()
-plt.title("wavelet Denoising Example")
-plt.show()
+
+
+
+        
+            
