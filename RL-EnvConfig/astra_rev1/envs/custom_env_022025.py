@@ -12,7 +12,7 @@ class NoiseReductionEnv(gym.Env):
 
         # Define observation space: [time, clean_signal, raw_signal, filtered_signal, threshold_factor, SNR_raw, SNR_filtered, prev_reward]
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(8,), dtype=np.float32)
-        self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(1,), dtype=np.float32)
+        self.action_space = spaces.Discrete(2)  # 0: Increase, 1: Decrease & Switch
 
         self.time = 0
         self.threshold_factor = 0.1
@@ -63,6 +63,8 @@ class NoiseReductionEnv(gym.Env):
         return pywt.waverec(coeffs, wavelet)
     
     def calculate_SNR(self, clean_signal, noisy_signal):
+        if np.mean(noisy_signal) == 0:
+            return np.nan
         noise = noisy_signal - clean_signal  # Extract noise component
         signal_power = np.mean(clean_signal**2)  # Power of the clean signal
         noise_power = np.mean(noise**2)  # Power of the noise
@@ -105,47 +107,53 @@ class NoiseReductionEnv(gym.Env):
 
     def step(self, action):
         self.iteration += 1
+        # Modify filter parameters
+        if action == 0:
+            self.change_method = (1) * self.change_method #keep 
+        elif action == 1:
+            self.change_method = (-1) * self.change_method
+        self.threshold_factor = self.threshold_factor + (self.step_size * self.change_method)
+        #self.threshold_factor = min(1, self.threshold_factor)
 
-        # Ensure action is a scalar (if received as an array)
-        action = np.clip(action, -1.0, 1.0)  # Keep within bounds
-        
-        # Define a scaling factor for action -> threshold_factor adjustment
-        step_size = 0.1  # You can experiment with this value
-        self.threshold_factor += step_size * action  # Adjust threshold factor
-        
-        # Ensure threshold_factor remains within a reasonable range
-        self.threshold_factor = np.clip(self.threshold_factor, 0.01, 2.0)  # Example limits
-
-        # Apply filtering using new threshold factor
-        self.filtered_signal = self.apply_filter(self.raw_signal, threshold_factor=self.threshold_factor)
+        # Apply filtering using new values
+        self.filtered_signal = self.apply_filter(signal = self.raw_signal, threshold_factor = self.threshold_factor)
 
         # Compute updated SNR
         self.SNR_raw = self.calculate_SNR(self.clean_signal, self.raw_signal)
         self.SNR_filtered = self.calculate_SNR(self.clean_signal, self.filtered_signal)
 
-        # Calculate reward
-        reward = self.SNR_filtered - self.SNR_raw
+        reward = np.square(np.subtract(self.SNR_filtered, self.SNR_raw)).mean()
+        if np.isnan(reward):
+            reward = -1
         self.reward_history.append(reward)
         self.prev_reward = reward
 
-        # Check for termination condition
         done = False
         if self.iteration >= 100:
-            if len(self.reward_history) > 10:
+            if len(self.reward_history) > 10:  # Ensure we have enough data
+                # Get the last window_size rewards
                 recent_rewards = self.reward_history[-10:]
+
+                # Calculate the standard deviation of the recent rewards
                 std_dev = np.std(recent_rewards)
-                if std_dev < 1e-3:  
+
+                #print(f"Standard deviation over last {10} steps: {std_dev:.4f}")
+
+                # If the standard deviation is below a certain threshold, consider the reward plateaued
+                if std_dev < 1e-2:  # Threshold for plateau detection (tune as needed)
                     done = True
                 else:
                     done = False
             else:
-                done = False
-
-        # Update the state
+                done = False  # Not enough data to determine plateau yet
+        '''
+        if np.mean(self.filtered_signal) == 0:
+            print(self.raw_signal)
+            print(self.filtered_signal)
+        '''
         state = np.array([
             self.time, np.mean(self.clean_signal), np.mean(self.raw_signal),
-            np.mean(self.filtered_signal), self.threshold_factor,
-            self.SNR_raw, self.SNR_filtered, self.prev_reward
+            np.mean(self.filtered_signal), self.threshold_factor, self.SNR_raw, self.SNR_filtered, self.prev_reward
         ], dtype=np.float32)
 
         return state, reward, done, False, {}  # False = 'truncated', {} = 'info'
@@ -153,4 +161,3 @@ class NoiseReductionEnv(gym.Env):
 
     def render(self, mode='human'):
         print(f"Iteration: {self.iteration}, Threshold: {self.threshold_factor:.6f}, "f"SNR Raw: {self.SNR_raw:.2f}, SNR Filtered: {self.SNR_filtered:.2f}")
-

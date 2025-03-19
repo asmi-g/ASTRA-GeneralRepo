@@ -1,42 +1,44 @@
 import gymnasium as gym
 import numpy as np
-from stable_baselines3 import DQN
-from stable_baselines3.common.env_util import make_vec_env
-from stable_baselines3.common.evaluation import evaluate_policy
+import pandas as pd
 import matplotlib.pyplot as plt
+from stable_baselines3 import DQN
+from stable_baselines3.common.env_checker import check_env
 from astra_rev1.envs import NoiseReductionEnv
 
-# Create environment
+# Load dataset (first 10,000 rows)
+df = pd.read_csv("Data/simulated_signal_data.csv", nrows=10000)
+
+# Initialize environment
 env = NoiseReductionEnv()
 
-# Wrap environment in vectorized wrapper (for compatibility)
-vec_env = make_vec_env(lambda: env, n_envs=1)
-#'''
-model = DQN("MlpPolicy", env, verbose=1)
-model.learn(total_timesteps=10000, log_interval=4)
+# Check if environment is compatible with Stable-Baselines3
+check_env(env, warn=True)
+
+# --- DQN Model Configuration ---
+model = DQN(
+    "MlpPolicy",  # Use a multi-layer perceptron policy
+    env,
+    learning_rate=1e-3,
+    buffer_size=50000,
+    batch_size=32,
+    gamma=0.99,
+    exploration_fraction=0.1,
+    exploration_final_eps=0.01,
+    target_update_interval=500,
+    train_freq=1,
+    gradient_steps=1,
+    verbose=1
+)
+
+# --- Training the Agent ---
+TIMESTEPS = 10000  # Adjust based on compute power
+print(f"Training DQN for {TIMESTEPS} timesteps...")
+model.learn(total_timesteps=TIMESTEPS, log_interval=100)
+
+# Save trained model
 model.save("dqn_noise_reduction")
-#'''
+print("Model saved as 'dqn_noise_reduction'")
 
-# Load trained model (optional)
-model = DQN.load("dqn_noise_reduction", env=env)
-
-# Evaluate the trained agent
-mean_reward, std_reward = evaluate_policy(model, env, n_eval_episodes=10)
-print(f"Mean reward: {mean_reward}, Std reward: {std_reward}")
-
-# Run a test episode to visualize results
-obs, _ = env.reset()
-rewards = []
-for _ in range(100):
-    action, _states = model.predict(obs, deterministic=True)
-    next_state, reward, done, truncated, info = env.step(action)
-    rewards.append(reward)
-    if done:
-        break
-
-# Plot reward progression
-plt.plot(rewards)
-plt.xlabel("Step")
-plt.ylabel("Reward")
-plt.title("DQN Reward Progression in Noise Reduction")
-plt.show()
+# Close environment
+env.close()

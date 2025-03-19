@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from astra_rev1.envs import NoiseReductionEnv
 
 # Load dataset (first 10,000 rows)
-df = pd.read_csv("Data/simulated_signal_data.csv", nrows=10000)
+df = pd.read_csv("Data/simulated_signal_data.csv")
 
 # Initialize environment
 env = NoiseReductionEnv()
@@ -19,7 +19,7 @@ current_window_noisy = df.iloc[:window_size]["Noisy Signal"].tolist()
 state = env.reset(clean_signal=np.array(current_window_clean),
                   noisy_signal=np.array(current_window_noisy))
 
-print("State variables: time, clean_signal, raw_signal, filtered_signal, C, L, R, SNR_raw, SNR_filtered, prev_reward")
+print("State variables: time, clean_signal, raw_signal, filtered_signal, SNR_raw, SNR_filtered, prev_reward")
 print("Initial state:", state)
 
 # Tracking metrics
@@ -27,6 +27,7 @@ rewards = []
 snr_raw_list = []
 snr_filtered_list = []
 snr_diff = []
+threshold_factors = []
 
 action = 0  # Initial action
 prev_reward = 0
@@ -51,21 +52,24 @@ for i in range(window_size, len(df)):
     snr_raw_list.append(snr_raw)
     snr_filtered_list.append(snr_filtered)
     snr_diff.append(snr_filtered - snr_raw)
+    threshold_factors.append(t_factor)
 
-    print(f"Rows {i-window_size, i} | Action: {action} | Reward: {curr_reward:.4f} | SNR Raw: {snr_raw:.2f} | SNR Filtered: {snr_filtered:.2f} | Done: {done} | filtered signal: {filtered_signal} | threshold factor: {t_factor}")
+    print(f"Rows {i-window_size, i} | Action: {action} | Reward: {curr_reward:.4f} | SNR Raw: {snr_raw:.2f} | SNR Filtered: {snr_filtered:.2f} | Done: {done} | filtered signal: {filtered_signal} | clean signal: {np.mean(current_window_clean)} | threshold factor: {t_factor}")
 
     # Choose next action based on SNR improvement
-    if prev_reward <= curr_reward:
-        action = action + 0.1 
-    elif prev_reward > curr_reward:
-        action = action - 0.1
+    if (prev_reward > curr_reward) | (curr_reward == -1):
+        action = 1 
+    elif prev_reward <= curr_reward:
+        action = 0
     prev_reward = curr_reward
 
+    '''
     if done:
         print("Termination condition met. Resetting environment.")
         state = env.reset(clean_signal=np.array(current_window_clean),
                           noisy_signal=np.array(current_window_noisy))
         break
+    '''
     
     # Slide window: Remove oldest, add new
     current_window_clean.pop(0)
@@ -80,14 +84,14 @@ env.close()
 plt.figure(figsize=(10, 5))
 
 # Plot SNR changes
+#'''
 plt.subplot(1, 2, 1)
-plt.plot(snr_raw_list, label="SNR Raw", linestyle="dashed", color="red")
-plt.plot(snr_filtered_list, label="SNR Filtered", color="green")
-#plt.plot(snr_diff, label="SNR diff", color="blue")
+plt.plot(threshold_factors, label="Threshold Factor", color="purple")
 plt.xlabel("Time Steps")
-plt.ylabel("SNR (dB)")
-plt.title("SNR Raw vs. SNR Filtered")
+plt.ylabel("Threshold Factor")
+plt.title("Threshold Factor Over Time")
 plt.legend()
+#'''
 
 # Plot rewards
 plt.subplot(1, 2, 2)
@@ -97,5 +101,5 @@ plt.ylabel("Reward")
 plt.title("Reward Over Time")
 plt.legend()
 
-plt.tight_layout()
+#plt.tight_layout()
 plt.show()
