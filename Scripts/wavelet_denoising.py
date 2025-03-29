@@ -1,4 +1,3 @@
-import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import pywt
@@ -13,7 +12,10 @@ THRESHOLD_MODE = 'soft'
 LEVEL = 2
 LAST_SIGNAL_INDEX_TO_PLOT = 500
 
-wavelets = ['db1', 'db2', 'db3', 'db4', 'db5', 'db6', 'db7', 'db8']
+LEVEL_MIN_VAL = 4
+LEVEL_MAX_VAL = 6
+THRESHOLD_MIN_VAL = 1
+THRESHOLD_MAX_VAL = 4
 
 def convert_ADC_to_signal(adc_values, v_ref, adc_bit_resolution):
     normalized_signal_reversed = adc_values / (2 ** adc_bit_resolution - 1)
@@ -38,10 +40,11 @@ class WaveletDenoiser:
 
     def denoise_signal(self):
         coeffs = self.__apply_wavelet_transform(self.noisy_signal)
-        if not self.threshold:
-            # Donoho and Silverman Universal Threshold
-            sigma = np.median(np.abs(coeffs[-1])) / 0.6745
-            self.threshold = sigma * np.sqrt(2 * np.log(len(self.noisy_signal)))
+        # TODO: As per Asmi's comments, do we want/need this with the RL model?
+        # if not self.threshold:
+        #     # Donoho and Silverman Universal Threshold
+        #     sigma = np.median(np.abs(coeffs[-1])) / 0.6745
+        #     self.threshold = sigma * np.sqrt(2 * np.log(len(self.noisy_signal)))
         coeffs[1:] = [pywt.threshold(c, self.threshold, mode=self.threshold_mode) for c in coeffs[1:]]
         self.denoised_signal = pywt.waverec(coeffs, self.wavelet)
         return self.denoised_signal
@@ -64,39 +67,29 @@ def main():
     normalized_clean_signal = convert_ADC_to_signal(clean_signal, V_REF, ADC_BIT_RESOLUTION)
 
     # Denoise the signal
-    denoisers = [[WaveletDenoiser(time_vector, normalized_noisy_signal, normalized_clean_signal, WAVELET, threshold, THRESHOLD_MODE, level) for threshold in range(1, 6)] for level in range(4, 6)]
+    denoisers = [[WaveletDenoiser(time_vector, normalized_noisy_signal, normalized_clean_signal, WAVELET, threshold, THRESHOLD_MODE, level) 
+                  for threshold in range(THRESHOLD_MIN_VAL, THRESHOLD_MAX_VAL + 1)] 
+                  for level in range(LEVEL_MIN_VAL, LEVEL_MAX_VAL + 1)]
 
+    # Plot thresholding coefficients and decomposition level sweep
     for denoiser_level in denoisers:
-        for denoiser in denoiser_level:
+        fig, axes = plt.subplots(THRESHOLD_MAX_VAL - THRESHOLD_MIN_VAL + 1, sharex=True, sharey=True)
+        for index, denoiser in enumerate(denoiser_level):
             denoised_signal = denoiser.denoise_signal()
-            threshold = denoiser.get_threshold()
-            level = denoiser.get_level()
-            plt.figure()
-            plt.plot(time_vector[:LAST_SIGNAL_INDEX_TO_PLOT], normalized_noisy_signal[:LAST_SIGNAL_INDEX_TO_PLOT], label="Noisy Signal")
-            plt.plot(time_vector[:LAST_SIGNAL_INDEX_TO_PLOT], denoised_signal[:LAST_SIGNAL_INDEX_TO_PLOT], label = "Filtered Signal")
-            plt.plot(time_vector[:LAST_SIGNAL_INDEX_TO_PLOT], normalized_clean_signal[:LAST_SIGNAL_INDEX_TO_PLOT], label="Clean Signal")
-            plt.title(f"Wavelet: {WAVELET}  Threshold: {threshold}  Level: {level}")
-            plt.xlabel("Time [s]")
-            plt.ylabel("Signal Amplitude [V]")
-            plt.legend()
-            plt.grid()
-    
+            # TODO: Why is this happening with the our data?
+            denoised_signal = denoised_signal[:-1]
+            subplot = axes[index]
+            subplot.plot(time_vector[:LAST_SIGNAL_INDEX_TO_PLOT], normalized_noisy_signal[:LAST_SIGNAL_INDEX_TO_PLOT], label="Noisy Signal")
+            subplot.plot(time_vector[:LAST_SIGNAL_INDEX_TO_PLOT], denoised_signal[:LAST_SIGNAL_INDEX_TO_PLOT], label = "Filtered Signal")
+            subplot.plot(time_vector[:LAST_SIGNAL_INDEX_TO_PLOT], normalized_clean_signal[:LAST_SIGNAL_INDEX_TO_PLOT], label="Clean Signal")
+            subplot.grid()
+        level = denoiser.get_level()
+        fig.suptitle(f"Wavelet: {WAVELET}   Level: {level}   Threshold: {THRESHOLD_MIN_VAL} - {THRESHOLD_MAX_VAL}") 
+        fig.supxlabel("Time [s]")
+        fig.supylabel("Signal Amplitude [V]")
+        handles, labels = subplot.get_legend_handles_labels()
+        fig.legend(handles, labels)
     plt.show()
-
-    # Plot
-    # plt.figure()
-    # plt.plot(time_vector[:LAST_SIGNAL_INDEX_TO_PLOT], normalized_noisy_signal[:LAST_SIGNAL_INDEX_TO_PLOT], label="Noisy Signal")
-    # plt.plot(time_vector[:LAST_SIGNAL_INDEX_TO_PLOT], denoised_signal[:LAST_SIGNAL_INDEX_TO_PLOT], label = "Filtered Signal")
-    # plt.plot(time_vector[:LAST_SIGNAL_INDEX_TO_PLOT], normalized_clean_signal[:LAST_SIGNAL_INDEX_TO_PLOT], label="Clean Signal")
-    # plt.title(f"Wavelet: {WAVELET}  Threshold: {THRESHOLD}  Level: {LEVEL}")
-    # plt.xlabel("Time [s]")
-    # plt.ylabel("Signal Amplitude [V]")
-    # plt.legend()
-    # plt.grid()
-    # plt.show()
-
-    # TODO: Why is this happening with the our data?
-    # denoised_signal = denoised_signal[:-1]
 
 if __name__ == "__main__":
     main()
