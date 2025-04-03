@@ -28,6 +28,9 @@ snr_raw_list = []
 snr_filtered_list = []
 snr_diff = []
 threshold_factors = []
+clean_signal_data = []
+noisy_signal_data = []
+filtered_signal_data = []
 
 action = 0  # Initial action
 prev_reward = 0
@@ -42,10 +45,10 @@ for i in range(window_size, len(df)):
     next_state, curr_reward, done, truncated, info = env.step(action)
     
     # Extract SNR values from next_state
-    snr_raw = next_state[5]  # Assuming index 7 is SNR_raw
-    snr_filtered = next_state[6]  # Assuming index 8 is SNR_filtered
-    filtered_signal = next_state[3]
-    t_factor = next_state[4]
+    snr_raw = info["SNR_raw"]     
+    snr_filtered = info["SNR_filtered"]  
+    filtered_signal = info["filtered_signal"]  # Full window
+    t_factor = info["threshold_factor"]
 
     # Store results
     rewards.append(curr_reward)
@@ -54,7 +57,7 @@ for i in range(window_size, len(df)):
     snr_diff.append(snr_filtered - snr_raw)
     threshold_factors.append(t_factor)
 
-    print(f"Rows {i-window_size, i} | Action: {action} | Reward: {curr_reward:.4f} | SNR Raw: {snr_raw:.2f} | SNR Filtered: {snr_filtered:.2f} | Done: {done} | filtered signal: {filtered_signal} | clean signal: {np.mean(current_window_clean)} | threshold factor: {t_factor}")
+    print(f"Rows {i-window_size, i} | Action: {action} | Reward: {curr_reward:.4f} | SNR Raw: {snr_raw:.2f} | SNR Filtered: {snr_filtered:.2f} | Done: {done} | filtered signal: {np.mean(filtered_signal):.4f} | clean signal: {np.mean(current_window_clean):.4f} | threshold factor: {t_factor:.4f}")
 
     # Choose next action based on SNR improvement
     if (prev_reward > curr_reward) | (curr_reward == -1):
@@ -70,7 +73,10 @@ for i in range(window_size, len(df)):
                           noisy_signal=np.array(current_window_noisy))
         break
     '''
-    
+    clean_signal_data.extend(info["clean_signal"])   
+    noisy_signal_data.extend(info["noisy_signal"])
+    filtered_signal_data.extend(filtered_signal)
+
     # Slide window: Remove oldest, add new
     current_window_clean.pop(0)
     current_window_noisy.pop(0)
@@ -84,22 +90,32 @@ env.close()
 plt.figure(figsize=(10, 5))
 
 # Plot SNR changes
-#'''
-plt.subplot(1, 2, 1)
+'''
+plt.subplot(2, 1, 1)
 plt.plot(threshold_factors, label="Threshold Factor", color="purple")
 plt.xlabel("Time Steps")
 plt.ylabel("Threshold Factor")
 plt.title("Threshold Factor Over Time")
 plt.legend()
-#'''
+'''
 
 # Plot rewards
-plt.subplot(1, 2, 2)
+plt.subplot(2, 1, 2)
 plt.plot(rewards, label="Reward", color="blue")
 plt.xlabel("Time Steps")
 plt.ylabel("Reward")
 plt.title("Reward Over Time")
 plt.legend()
 
-#plt.tight_layout()
+plt.subplot(2, 1, 1)
+plt.plot(clean_signal_data, label="Clean Signal", color="blue", alpha=0.8)
+#plt.plot(noisy_signal_data, label="Noisy Signal", linestyle="dashed", color="orange", alpha=0.7)
+plt.plot(filtered_signal_data, label="Filtered Signal", color="green", alpha=0.8)
+plt.xlabel("Time Steps")
+plt.ylabel("Signal Amplitude")
+plt.title("Clean vs. Noisy vs. Filtered Signal")
+plt.legend()
+
+
+plt.tight_layout()
 plt.show()

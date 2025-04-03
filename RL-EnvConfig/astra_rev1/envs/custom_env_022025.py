@@ -2,20 +2,18 @@
 import gymnasium as gym
 from gymnasium import spaces
 import numpy as np
-import scipy.signal
-from scipy.signal import butter, filtfilt #for filDeiter
 import pywt
 
 class NoiseReductionEnv(gym.Env):
     def __init__(self):
         super(NoiseReductionEnv, self).__init__()
 
-        # Define observation space: [time, clean_signal, raw_signal, filtered_signal, threshold_factor, SNR_raw, SNR_filtered, prev_reward]
-        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(8,), dtype=np.float32)
-        self.action_space = spaces.Discrete(2)  # 0: Increase, 1: Decrease & Switch
+        # Define observation space: [time, clean_signal, raw_signal, filtered_signal, threshold_factor, SNR_raw, SNR_filtered, prev_reward, inuse_operation]
+        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(9,), dtype=np.float32)
+        self.action_space = spaces.Discrete(2)  # 0: repeat operation, 1: use opposite operation
 
         self.time = 0
-        self.threshold_factor = 0.1
+        self.threshold_factor = 1
         self.clean_signal = np.zeros(10)
         self.raw_signal = np.zeros(10)
         self.filtered_signal = np.zeros(10)
@@ -25,34 +23,13 @@ class NoiseReductionEnv(gym.Env):
         self.iteration = 0
         self.reward_history = []
         
-        self.change_method = 1 # Default: Increase
-        self.step_size = max(1e-9, 0.1)  # Dynamic step size
+        self.inuse_operation = 1 # Default: Increase
+        self.step_size = 0.1  # Dynamic step size
     
     #helper functions
-    '''
-    def apply_filter(self, signal, cutoff_freq=50, fs=1000, order=2): # wavelet denoising -- use python prototype for this
-        """
-        Applies a Butterworth low-pass filter to the input signal.
-        
-        :param signal: The input signal array
-        :param cutoff_freq: Cutoff frequency in Hz
-        :param fs: Sampling frequency in Hz
-        :param order: Order of the filter (higher = sharper roll-off)
-        :return: Filtered signal
-        """
-        nyquist = 0.5 * fs  # Nyquist frequency
-        normal_cutoff = cutoff_freq / nyquist  # Normalize frequency
-        b, a = butter(order, normal_cutoff, btype='low', analog=False)
-        return filtfilt(b, a, signal)  # Zero-phase filtering
-
-    def calculate_SNR(self, noisy_signal, fs = 1.0): # TODO: verify
-        """Estimate SNR using Power Spectral Density (PSD) method."""
-        freqs, psd = scipy.signal.welch(noisy_signal, fs=fs, nperseg=len(noisy_signal)//8)  # Compute PSD
-        # Assume noise power is the average power in high frequencies
-        noise_power = np.mean(psd[len(psd)//2:])  # Upper half of frequencies
-        signal_power = np.mean(psd)  # Total power
-        return 10 * np.log10(signal_power / (noise_power + 1e-10)) # SNR in dB
-    '''
+    def set_threshold_factor(self, new_threshold_factor):
+        """Sets the threshold factor from outside the environment."""
+        self.threshold_factor = new_threshold_factor
 
     def apply_filter(self, signal, wavelet='db4', level=1, threshold_factor=0.5):
         # threshold_factor is modifiable
@@ -95,25 +72,37 @@ class NoiseReductionEnv(gym.Env):
 
         self.iteration = 0
         self.reward_history = []
-        self.change_method = 1
+        self.inuse_operation = 1
         
         state = np.array([
             self.time, np.mean(self.clean_signal), np.mean(self.raw_signal),
             np.mean(self.filtered_signal), self.threshold_factor,
-            self.SNR_raw, self.SNR_filtered, 0
+            self.SNR_raw, self.SNR_filtered, 0, self.inuse_operation
         ], dtype=np.float32)
 
         return state, {}
 
     def step(self, action):
         self.iteration += 1
+
         # Modify filter parameters
-        if action == 0:
-            self.change_method = (1) * self.change_method #keep 
-        elif action == 1:
-            self.change_method = (-1) * self.change_method
-        self.threshold_factor = self.threshold_factor + (self.step_size * self.change_method)
-        #self.threshold_factor = min(1, self.threshold_factor)
+        if action == 0: # repeat operation
+            if self.inuse_operation == 1:
+                self.threshold_factor = self.threshold_factor + self.step_size
+            elif self.inuse_operation == -1:
+                self.threshold_factor = self.threshold_factor - self.step_size
+        elif action == 1: #change operation
+            if self.inuse_operation == 1:
+                self.threshold_factor = self.threshold_factor - self.step_size
+                self.inuse_operation = -1
+            elif self.inuse_operation == -1:
+                self.threshold_factor = self.threshold_factor + self.step_size
+                self.inuse_operation = 1
+        #elif action == 2:
+            #self.threshold_factor = self.threshold_factor - self.step_size
+
+        self.threshold_factor = min(5, self.threshold_factor)
+        self.threshold_factor = max(-5, self.threshold_factor)
 
         # Apply filtering using new values
         self.filtered_signal = self.apply_filter(signal = self.raw_signal, threshold_factor = self.threshold_factor)
@@ -122,7 +111,10 @@ class NoiseReductionEnv(gym.Env):
         self.SNR_raw = self.calculate_SNR(self.clean_signal, self.raw_signal)
         self.SNR_filtered = self.calculate_SNR(self.clean_signal, self.filtered_signal)
 
-        reward = np.square(np.subtract(self.SNR_filtered, self.SNR_raw)).mean()
+        reward = np.log1p(max(self.SNR_filtered - self.SNR_raw, 0))
+        #reward = np.square(np.subtract(self.SNR_filtered, self.SNR_raw)).mean()
+        #reward = max(0, -(np.mean(self.filtered_signal) - np.mean(self.clean_signal)) + 1e-10)
+
         if np.isnan(reward):
             reward = -1
         self.reward_history.append(reward)
@@ -153,10 +145,22 @@ class NoiseReductionEnv(gym.Env):
         '''
         state = np.array([
             self.time, np.mean(self.clean_signal), np.mean(self.raw_signal),
-            np.mean(self.filtered_signal), self.threshold_factor, self.SNR_raw, self.SNR_filtered, self.prev_reward
+            np.mean(self.filtered_signal), self.threshold_factor, self.SNR_raw, self.SNR_filtered, self.prev_reward, self.inuse_operation
         ], dtype=np.float32)
 
-        return state, reward, done, False, {}  # False = 'truncated', {} = 'info'
+        info = {
+            "time": self.time,
+            "clean_signal": self.clean_signal,  # Full window
+            "noisy_signal": self.raw_signal,    # Full window
+            "filtered_signal": self.filtered_signal,  # Full window
+            "threshold_factor": self.threshold_factor,
+            "SNR_raw": self.SNR_raw,
+            "SNR_filtered": self.SNR_filtered,
+            "prev_reward": self.prev_reward,
+            "inuse_operation": self.inuse_operation
+        }
+
+        return state, reward, done, False, info  # False = 'truncated', {} = 'info'
 
 
     def render(self, mode='human'):
