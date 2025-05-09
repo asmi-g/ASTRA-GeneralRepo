@@ -54,6 +54,12 @@ class WaveletDenoiser:
 
     def get_level(self):
         return self.level
+    
+    def set_threshold(self, threshold):
+        self.threshold = threshold
+
+    def set_decomp_level(self, level):
+        self.level = level
 
 def main():
     # Reading in ADC data
