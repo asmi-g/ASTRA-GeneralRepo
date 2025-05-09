@@ -1,81 +1,138 @@
-import gymnasium as gym
+# train_noise_reduction.py
+
+import os
 import numpy as np
-import matplotlib.pyplot as plt
-from stable_baselines3 import DQN
+import random
+import torch
+from stable_baselines3 import SAC
 from stable_baselines3.common.env_checker import check_env
 from astra_rev1.envs import NoiseReductionEnv
+from callbacks import NoiseReductionLogger
+from stable_baselines3.common.noise import NormalActionNoise
 
-# --- Generate Synthetic Signal ---
-def generate_synthetic_signal(signal_type="sine", noise_level=0.2, length=100):
-    """
-    Generates a clean signal and adds noise to create a noisy version.
-    
-    :param signal_type: Type of signal ("sine", "square", "sawtooth", "random")
-    :param noise_level: Standard deviation of Gaussian noise
-    :param length: Number of samples
-    :return: (clean_signal, noisy_signal)
-    """
+# 🔄 CHANGED: Added action noise for exploration
+action_noise = NormalActionNoise(mean=np.array([0.0]), sigma=np.array([0.1]))
+
+# Set seeds for reproducibility
+SEED = 42
+random.seed(SEED)
+np.random.seed(SEED)
+torch.manual_seed(SEED)
+
+# Create directories for logs and models
+os.makedirs("logs/tensorboard", exist_ok=True)
+os.makedirs("models", exist_ok=True)
+
+# 🔄 CHANGED: Now supports varied signal types and noise levels
+def generate_synthetic_signal(signal_type=None, noise_level=None, length=100):
     t = np.linspace(0, 1, length)
+    signal_type = signal_type or random.choice(["sine", "square", "sawtooth", "random"])
+    noise_level = noise_level if noise_level is not None else np.random.uniform(0.2, 0.5)
 
     if signal_type == "sine":
-        clean_signal = np.sin(2 * np.pi * 5 * t)  # 5 Hz sine wave
+        clean = np.sin(2 * np.pi * 5 * t)
     elif signal_type == "square":
-        clean_signal = np.sign(np.sin(2 * np.pi * 5 * t))  # Square wave
+        clean = np.sign(np.sin(2 * np.pi * 5 * t))
     elif signal_type == "sawtooth":
-        clean_signal = 2 * (t * 5 % 1) - 1  # Sawtooth wave
+        clean = 2 * (t * 5 % 1) - 1
     elif signal_type == "random":
-        clean_signal = np.random.uniform(-1, 1, size=length)  # Random signal
+        clean = np.random.uniform(-1, 1, size=length)
     else:
         raise ValueError("Unknown signal type!")
 
-    noise = np.random.normal(0, noise_level, size=length)
-    noisy_signal = clean_signal + noise
-    return clean_signal, noisy_signal
+    noisy = clean + np.random.normal(0, noise_level, size=length)
+    return clean, noisy
 
-# Generate the signal
-clean_signal, noisy_signal = generate_synthetic_signal("sine", noise_level=0.3)
-
-'''
-# Optional: Plot the signals to verify
-plt.figure(figsize=(10, 4))
-plt.plot(clean_signal, label="Clean Signal")
-plt.plot(noisy_signal, label="Noisy Signal", alpha=0.7)
-plt.legend()
-plt.title("Generated Synthetic Signal")
-plt.show()'
-'''
-
+# Initialize environment
 env = NoiseReductionEnv()
-env.reset(clean_signal=clean_signal, noisy_signal=noisy_signal)
-
-# Check if environment is compatible with Stable-Baselines3
 check_env(env, warn=True)
 
-# --- DQN Model Configuration ---
-model = DQN(
+# Initialize model
+model = SAC(
     "MlpPolicy",
     env,
-    learning_rate=1e-3,
-    buffer_size=50000,
-    batch_size=32,
+    ent_coef="auto",  # 🔄 CHANGED: Encourage exploration via entropy bonus
+    action_noise=action_noise,  # 🔄 CHANGED: Added action noise
+    learning_rate=1e-4,
+    buffer_size=100000,
+    batch_size=128,
+    tau=0.005,
     gamma=0.99,
-    exploration_fraction=0.01,
-    exploration_initial_eps = 1,
-    exploration_final_eps=0.01,
-    target_update_interval=500,
     train_freq=1,
-    gradient_steps=1,
-    verbose=1
+    gradient_steps=4,  # 🔄 CHANGED: More frequent updates per step
+    verbose=1,
+    tensorboard_log="logs/tensorboard"
 )
+from stable_baselines3.common.logger import configure
 
-# --- Training the Agent ---
-TIMESTEPS = 100000
-print(f"Training DQN for {TIMESTEPS} timesteps...")
-model.learn(total_timesteps=TIMESTEPS, log_interval=10000)
+model._logger = configure(folder="logs/tensorboard", format_strings=["stdout", "tensorboard"])
+model._current_progress_remaining = 1.0  # Full training progress at start
 
-# Save trained model
-model.save("dqn_noise_reduction")
-print("Model saved as 'dqn_noise_reduction'")
 
-# Close environment
-env.close()
+WINDOW_SIZE = 10
+SIGNAL_LENGTH = 100
+TOTAL_EPISODES = 5000
+
+# Training Loop
+for episode in range(TOTAL_EPISODES):
+    clean_full, noisy_full = generate_synthetic_signal(length=SIGNAL_LENGTH)
+
+    for i in range(SIGNAL_LENGTH - WINDOW_SIZE):
+        clean_window = clean_full[i:i + WINDOW_SIZE]
+        noisy_window = noisy_full[i:i + WINDOW_SIZE]
+
+        if i == 0:
+            obs, _ = env.reset(clean_signal=clean_window, noisy_signal=noisy_window)
+        else:
+            env.set_signal_window(clean_window, noisy_window)
+
+        action, _ = model.predict(obs, deterministic=False)
+        next_obs, reward, done, _, info = env.step(action)
+
+        # Manually store transition
+        model.replay_buffer.add(obs, next_obs, action, reward, done, [{}])
+        model.train(batch_size=model.batch_size, gradient_steps=1)
+
+        obs = next_obs
+
+    if episode % 100 == 0:
+        print(f"Step {episode} | Action: {action[0]:.4f} | Threshold: {env.threshold_factor:.3f} | Reward: {reward:.3f}") 
+
+
+# Callback for custom logging
+# callback = NoiseReductionLogger()
+# TOTAL_TIMESTEPS = 1000
+# model.learn(total_timesteps=TOTAL_TIMESTEPS, callback=callback)
+
+model.save("models/sac_noise_reduction")
+print("Model saved to 'models/sac_noise_reduction'")
+
+# # Training parameters
+# WINDOW_SIZE = 10
+# SIGNAL_LENGTH = 100
+# TOTAL_EPISODES = 1000
+
+# # 🔄 CHANGED: Use sliding window over new signal every episode
+# for episode in range(TOTAL_EPISODES):
+#     clean_full, noisy_full = generate_synthetic_signal(length=SIGNAL_LENGTH)
+#     total_reward = 0
+
+#     for i in range(SIGNAL_LENGTH - WINDOW_SIZE):
+#         clean_window = clean_full[i:i + WINDOW_SIZE]
+#         noisy_window = noisy_full[i:i + WINDOW_SIZE]
+
+#         if i == 0:
+#             obs, _ = env.reset(clean_signal=clean_window, noisy_signal=noisy_window)
+#         else:
+#             env.set_signal_window(clean_window, noisy_window)
+
+#         action, _ = model.predict(obs)
+#         obs, reward, done, _, info = env.step(action)
+#         total_reward += reward
+
+#     # 🔄 CHANGED: Better logging for debugging
+#     if episode % 100 == 0:
+#         print(f"Episode {episode} | Total Reward: {total_reward:.2f} "
+#               f"| Threshold: {info['threshold_factor']:.3f} | Action: {action}")
+
+# Save the model

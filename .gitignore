@@ -180,3 +180,7 @@ pyrightconfig.json
 # End of .gitignore
 # =====================
 dqn_noise_reduction.zip
+logs/training_metrics.png
+logs/tensorboard/events.out.tfevents.1746169511.DESKTOP-DGMFJ5G.20964.0
+logs/tensorboard/events.out.tfevents.1746208766.DESKTOP-DGMFJ5G.32856.0
+logs/tensorboard/SAC_1/events.out.tfevents.1746168753.DESKTOP-DGMFJ5G.31880.0
