@@ -1,0 +1,15 @@
+numpy
+matplotlib
+gnuradio
+sys
+signal
+argparse 
+
+
+
+subprocess
+threading
+time
+os
+platform
+
