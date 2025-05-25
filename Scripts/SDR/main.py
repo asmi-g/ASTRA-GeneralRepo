@@ -19,6 +19,7 @@ RUNTIME_SECONDS = 10  # duration to run TX/RX per cycle
 # - Fix: "sink :warning: Soapy sink error: TIMEOUT"
 # - Integrate Chelsea's comments from previous pr
 # - Integrate AM scripts, address throttle block error and rerun on WSL
+# - Integrate timed operation for flight
 
 
 
