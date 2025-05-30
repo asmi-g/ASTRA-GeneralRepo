@@ -1,130 +1,164 @@
 #step 1: creating custom environment by subclassing gym.Env
-import gym
+import gymnasium as gym
+from gymnasium import spaces
 import numpy as np
-from gym import spaces
-import scipy.signal
-from scipy.signal import butter, filtfilt #for filDeiter
+import pywt
 
 class NoiseReductionEnv(gym.Env):
     def __init__(self):
-        super(NoiseReductionEnv, self).__init__()
-        # Define state space: [time, raw_signal, filtered_signal, C, L, R, SNR_raw, SNR_filtered, prev_reward]
+        super().__init__()
+
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(9,), dtype=np.float32)
-        self.action_space = spaces.Discrete(2)  # 0: Increase, 1: Decrease & Rotate
+        self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(1,), dtype=np.float32)
 
-        self.time = 0
-        self.C = 0.000001  # 1 uF; initial value
-        self.L = 0.000001  # 1 uH; initial value
-        self.R = 1000 # 1 kOhm; initial value
-        self.raw_signal = self.generate_noisy_signal() # in practice, will be connect to signal simulation or real-time signal feed
-        self.filtered_signal = self.apply_filter(self.raw_signal) # in practice, signal will be taken directly from output of DSP
-        self.SNR_raw = self.calculate_SNR(self.raw_signal) # verify calculation
-        self.SNR_filtered = self.calculate_SNR(self.filtered_signal)
+        self.step_size = 0.1
+        self.threshold_factor = 1.0
         self.prev_reward = 0
-        self.iteration = 0
         self.reward_history = []
-        
-        self.var_map = {'C': self.C, 'L': self.L, 'R': self.R}
-        self.change_var = 'C'  # Default to capacitance
-        self.param_index = 0  # Tracks which parameter is being modified
-        self.step_size = 0.01 * self.var_map[self.change_var]  # Dynamic step size
-    
-    #helper functions
-    def generate_noisy_signal(self):
-        """Simulates a synthetic noisy signal"""
-        signal_length = 100
-        pure_signal = np.sin(np.linspace(0, 2 * np.pi, signal_length))  # Pure sine wave
-        noise = np.random.normal(0, 0.5, signal_length)  # Gaussian noise
-        return pure_signal + noise
-
-    def apply_filter(self, signal, cutoff_freq=50, fs=1000, order=2):
-        """
-        Applies a Butterworth low-pass filter to the input signal.
-        
-        :param signal: The input signal array
-        :param cutoff_freq: Cutoff frequency in Hz
-        :param fs: Sampling frequency in Hz
-        :param order: Order of the filter (higher = sharper roll-off)
-        :return: Filtered signal
-        """
-        nyquist = 0.5 * fs  # Nyquist frequency
-        normal_cutoff = cutoff_freq / nyquist  # Normalize frequency
-        b, a = butter(order, normal_cutoff, btype='low', analog=False)
-        return filtfilt(b, a, signal)  # Zero-phase filtering
-
-    def calculate_SNR(self, noisy_signal, fs = 1.0): # TODO: verify
-        """Estimate SNR using Power Spectral Density (PSD) method."""
-        freqs, psd = scipy.signal.welch(noisy_signal, fs=fs, nperseg=len(noisy_signal)//8)  # Compute PSD
-        # Assume noise power is the average power in high frequencies
-        noise_power = np.mean(psd[len(psd)//2:])  # Upper half of frequencies
-        signal_power = np.mean(psd)  # Total power
-        return 10 * np.log10(signal_power / (noise_power + 1e-10)) # SNR in dB
-    
-    def reset(self):
-        """Resets the environment to an initial state"""
-        self.time = 0
         self.iteration = 0
-        self.C = 0.000001  # 1 uF; initial value
-        self.L = 0.000001  # 1 uH; initial value
-        self.R = 1000 # 1 kOhm; initial value
-        self.raw_signal = self.generate_noisy_signal()
+        self.no_signal = False
+
+        # Dummy init values
+        self.clean_signal = np.zeros(10)
+        self.raw_signal = np.zeros(10)
+        self.filtered_signal = np.zeros(10)
+    
+    # helper functions
+    def set_signal_window(self, clean_signal, noisy_signal):
+        self.clean_signal = clean_signal
+        self.raw_signal = noisy_signal
+        if self.no_signal == True:
+            self.clean_signal = clean_signal[self.iteration:self.iteration+10]
+            self.raw_signal = noisy_signal[self.iteration:self.iteration+10]
+        if np.max(np.abs(self.clean_signal)) > 1000:
+            self.clean_signal = self.clean_signal / 1000.0
+            self.raw_signal = self.raw_signal / 1000.0
+
+    def apply_filter(self, signal, wavelet='db4', level=1, threshold_factor=1.0):
+        coeffs = pywt.wavedec(signal, wavelet, level=level)
+        sigma = np.median(np.abs(coeffs[-1])) / 0.6745
+        threshold = threshold_factor * sigma
+        coeffs = [pywt.threshold(c, threshold, mode='soft') for c in coeffs]
+        return pywt.waverec(coeffs, wavelet)
+
+    def calculate_SNR(self, clean, noisy):
+        noise = noisy - clean
+        signal_power = np.mean(clean**2)
+        noise_power = np.mean(noise**2)
+        return 10 * np.log10((signal_power + 1e-10) / (noise_power + 1e-10))
+
+    def reset(self, seed=None, options=None, clean_signal=None, noisy_signal=None):
+        self.no_signal = False
+        super().reset(seed=seed)
+        if clean_signal is None or noisy_signal is None:
+            self.no_signal = True
+            print("signal not provided; generating random signal")
+            self.clean_signal = np.sin(np.linspace(0, 2*np.pi, 5000))
+            self.raw_signal = self.clean_signal + np.random.normal(0, 0.3, size=5000)
+        else:
+            self.clean_signal = clean_signal
+            self.raw_signal = noisy_signal
+        
+        if np.max(np.abs(self.clean_signal)) > 1000:
+            self.clean_signal = self.clean_signal / 1000.0
+            self.raw_signal = self.raw_signal / 1000.0
+
+        self.threshold_factor = 1.0
         self.filtered_signal = self.apply_filter(self.raw_signal)
-        self.SNR_raw = self.calculate_SNR(self.raw_signal)
-        self.SNR_filtered = self.calculate_SNR(self.filtered_signal)
         self.prev_reward = 0
         self.reward_history = []
-        self.var_map = {'C': self.C, 'L': self.L, 'R': self.R}  # Update after reset
-        self.change_var = 'C'  # Default to capacitance
-        self.param_index = 0  # Tracks which parameter is being modified
-        self.step_size = 0.01 * self.var_map[self.change_var]  # Dynamic step size to account for differences between units
+        self.iteration = 0
 
-        state = np.array([self.time, np.mean(self.raw_signal), np.mean(self.filtered_signal), self.C, self.L, self.R, self.SNR_raw, self.SNR_filtered, self.prev_reward], dtype=np.float32)
-        return state
+        snr_raw = self.calculate_SNR(self.clean_signal, self.raw_signal)
+        snr_filtered = self.calculate_SNR(self.clean_signal, self.filtered_signal)
+
+        state = np.array([
+            self.iteration,
+            np.mean(self.clean_signal),
+            np.mean(self.raw_signal),
+            np.mean(self.filtered_signal),
+            self.threshold_factor,
+            snr_raw,
+            snr_filtered,
+            self.prev_reward,
+            np.mean(self.reward_history) if self.reward_history else 0.0
+        ], dtype=np.float32)
+        return state, {}
 
     def step(self, action):
         self.iteration += 1
-        # actions
-        if action == 0:  # Increase change_var
-            self.var_map[self.change_var] += self.step_size
-        elif action == 1:  # Decrease change_var, then rotate
-            self.var_map[self.change_var] -= self.step_size  # Reduce current param; this is still the previous step_size value
-            # Rotate: C -> L -> R -> C
-            self.param_index = (self.param_index + 1) % 3
-            self.change_var = ['C', 'L', 'R'][self.param_index]
-            self.step_size = 0.01 * self.var_map[self.change_var]
-            self.var_map[self.change_var] += self.step_size
+        delta = np.clip(float(action[0]), -1, 1)  # continuous action ∈ [-1, 1]
+        self.threshold_factor += self.step_size * delta
+        self.threshold_factor = np.clip(self.threshold_factor, 0.0, 5.0)
 
-        # SNR calculation
-        self.filtered_signal = self.apply_filter(self.raw_signal)
-        self.SNR_filtered = self.calculate_SNR(self.filtered_signal)
-        reward = self.SNR_filtered - self.SNR_raw
+        self.filtered_signal = self.apply_filter(self.raw_signal, threshold_factor=self.threshold_factor)
+        snr_raw = self.calculate_SNR(self.clean_signal, self.raw_signal)
+        snr_filtered = self.calculate_SNR(self.clean_signal, self.filtered_signal)
+
+        #reward = np.tanh(0.5 * (snr_filtered - snr_raw))
+        reward = snr_filtered - snr_raw
+
+        # Positive reward component
+        if reward > 0:
+            reward += 0.2 * reward  # encourage even modest improvements
+
+        # Penalize for distortion
+        bias_penalty = np.abs(np.mean(self.filtered_signal - self.clean_signal))
+        reward -= 0.05 * bias_penalty
+
+
+        # Discourage unnecessary filtering (but not too hard)
+        if abs(self.threshold_factor) < 0.01:
+            reward -= 0.02
+
+
         self.reward_history.append(reward)
         self.prev_reward = reward
-        # Termination condition: if ratio of last 10 rewards < 1% --> plateau
-        done = False
-        if self.iteration >= 100:
-            recent_rewards = self.reward_history[-10:]
-            if len(recent_rewards) >= 10 and np.abs(np.mean(np.diff(recent_rewards))) < 1.0:
-                done = True
 
-        # update individual variable (self.C, self.L, or self.R)
-        if self.change_var == 'C':
-            self.C = self.var_map['C']
-        elif self.change_var == 'L':
-            self.L = self.var_map['L']
-        else:
-            self.R = self.var_map['R']
-
-        # New state representation
         state = np.array([
-            self.time, np.mean(self.raw_signal), np.mean(self.filtered_signal),
-            self.C, self.L, self.R,  # These are the actual state variables now
-            self.SNR_raw, self.SNR_filtered, self.prev_reward
+            self.iteration,
+            np.mean(self.clean_signal),
+            np.mean(self.raw_signal),
+            np.mean(self.filtered_signal),
+            self.threshold_factor,
+            snr_raw,
+            snr_filtered,
+            self.prev_reward,
+            np.mean(self.reward_history) if self.reward_history else 0.0
         ], dtype=np.float32)
 
-        return state, reward, done, {}
+        info = {
+            "iteration": self.iteration,
+            "clean_signal": self.clean_signal,  # Full window
+            "noisy_signal": self.raw_signal,    # Full window
+            "filtered_signal": self.filtered_signal,  # Full window
+            "threshold_factor": self.threshold_factor,
+            "SNR_raw": snr_raw,
+            "SNR_filtered": snr_filtered,
+            "prev_reward": self.prev_reward,
+            "reward_history": self.reward_history
+        }
 
-    def render(self, mode='human'):
-        """Optional: Print current state"""
-        print(f"Iteration: {self.iteration}, C: {self.C:.2f}, L: {self.L:.2f}, R: {self.R:.2f}, SNR: {self.SNR_filtered:.2f}")
+        done = False
+        if self.iteration >= 100:
+            if len(self.reward_history) > 10:  # Ensure we have enough data
+                # Get the last window_size rewards
+                recent_rewards = self.reward_history[-10:]
 
+                # Calculate the standard deviation of the recent rewards
+                std_dev = np.std(recent_rewards)
+                # if self.iteration % 10 == 0:
+                #     print(f"Standard deviation over last {10} steps: {std_dev:.4f}")
+
+                # If the standard deviation is below a certain threshold, consider the reward plateaued
+                if std_dev < 1e-4:  # Threshold for plateau detection (tune as needed)
+                    done = True
+                else:
+                    done = False
+            else:
+                done = False  # Not enough data to determine plateau yet
+
+        return state, reward, done, False, info
+
+    def close(self):
+        pass
