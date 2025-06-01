@@ -11,11 +11,17 @@ import csv
 DATA_DIR = "Data/"
 TX_SCRIPT = "TX.py"
 RX_SCRIPT = "RX.py"
+ML_SCRIPT = "inference.py"
+TEMP_LOGGER_SCRIPT = "Scripts/SystemTesting/temperature_logger.py"
 CSV_FILE_PATH = os.path.join(DATA_DIR, "signal.csv")
 RUNTIME_SECONDS = 10  # duration to run TX/RX per cycle
 
 # TO DO
 # - Fix: "sink :warning: Soapy sink error: TIMEOUT"
+# - Integrate Chelsea's comments from previous pr
+# - Integrate AM scripts, address throttle block error and rerun on WSL
+# - Integrate timed operation for flight
+
 
 
 def install_requirements():
@@ -25,7 +31,7 @@ def install_requirements():
         print("Failed to install some packages. Continuing anyway...")
 
 
-def run_flowgraph(script_path):
+def run_script(script_path):
     if platform.system() == "Windows":
         return subprocess.Popen(["python", script_path])
     else:
@@ -63,10 +69,10 @@ def save_to_csv(rx_file_path, tx_file_path, csv_file_path):
             ])
 
 
-def cycle_once():
+def SDR_cycle():
     print("Launching TX and RX scripts...")
-    tx_proc = run_flowgraph(TX_SCRIPT)
-    rx_proc = run_flowgraph(RX_SCRIPT)
+    tx_proc = run_script(TX_SCRIPT)
+    rx_proc = run_script(RX_SCRIPT)
     
 
     print(f"Running for {RUNTIME_SECONDS} seconds...")
@@ -86,9 +92,24 @@ def cycle_once():
 def main():
     install_requirements()
 
-    while True:
-        cycle_once()
-        time.sleep(2)  # Optional delay between cycles
+    # Launch temperature logging script
+    print("Launching temperature logger...")
+    temp_logger_proc = run_script(TEMP_LOGGER_SCRIPT)
+
+    # Launch ML inference script once
+    print("Launching ML model...")
+    ml_proc = run_script(ML_SCRIPT)
+
+    # SDR capture loop
+    try:
+        while True:
+            SDR_cycle()
+            time.sleep(2)  # Optional delay between cycles
+    except KeyboardInterrupt:
+        print("Terminating Model Operation...")
+        terminate_process(ml_proc)
+        print("Terminating temperature logging...")
+        terminate_process(temp_logger_proc)
 
 
 if __name__ == "__main__":
