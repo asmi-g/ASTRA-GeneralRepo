@@ -5,15 +5,17 @@
 
 import time
 import sys
+sys.path.append('/home/nvidia/.local/lib/python3.6/site-packages')
+
 import board
 import busio
-import adafruit_mcp9808
+from Adafruit_MCP9808 import MCP9808
 
 # Initialize I2C connection (Jetson TX2 usually uses I2C bus 1)
 i2c = busio.I2C(board.SCL, board.SDA)
 # Initialize MCP9808 sensor
-sensor = adafruit_mcp9808.MCP9808(i2c)
-gi
+sensor = MCP9808.MCP9808(busnum=1)
+
 # Function to log temperature
 def log_temperature(log_file, interval=1):
   """
@@ -28,13 +30,13 @@ def log_temperature(log_file, interval=1):
     try:
       while True:
         # Read temperature
-        temperature = sensor.temperature
+        temperature = sensor.readTempC()
         # Get current timestamp
         timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
         # Log to file
-        file.write(f"{timestamp},{temperature:.2f}\n")
+        file.write("{}, {:.2f}\n".format(timestamp, temperature))
         file.flush()  # write to disk immediately
-        print(f"{timestamp} - Temperature: {temperature:.2f} °C")
+        print("{} - Temperature: {:.2f} C".format(timestamp, temperature))
         # Wait for the specified interval
         time.sleep(interval)
     except KeyboardInterrupt:
@@ -43,6 +45,6 @@ def log_temperature(log_file, interval=1):
 # Main function
 if __name__ == "__main__":
   timestamp = time.strftime("%Y-%m-%d_%H-%M-%S")
-  log_file_path = f"temperature_log_{timestamp}.csv"
+  log_file_path = "temperature_log_{}.csv".format(timestamp)
   log_interval = 5  # Set logging interval in seconds
   log_temperature(log_file_path, log_interval)
