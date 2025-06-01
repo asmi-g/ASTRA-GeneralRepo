@@ -100,5 +100,5 @@ def main(top_block_cls=TX, options=None):
     tb.wait()
 
 
-if __name__ == '__main__':
-    main()
+#if __name__ == '__main__':
+#    main()

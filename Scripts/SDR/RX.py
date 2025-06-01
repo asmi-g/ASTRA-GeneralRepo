@@ -97,5 +97,5 @@ def main(top_block_cls=RX, options=None):
     tb.wait()
 
 
-if __name__ == '__main__':
-    main()
+#if __name__ == '__main__':
+#    main()

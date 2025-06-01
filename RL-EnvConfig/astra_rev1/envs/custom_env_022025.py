@@ -41,6 +41,7 @@ class NoiseReductionEnv(gym.Env):
         """
         Applies a Butterworth low-pass filter to the input signal.
         
+<<<<<<< Updated upstream
         :param signal: The input signal array
         :param cutoff_freq: Cutoff frequency in Hz
         :param fs: Sampling frequency in Hz
@@ -68,6 +69,13 @@ class NoiseReductionEnv(gym.Env):
         self.L = 0.000001  # 1 uH; initial value
         self.R = 1000 # 1 kOhm; initial value
         self.raw_signal = self.generate_noisy_signal()
+=======
+        if (self.clean_signal.size > 0) and (np.max(np.abs(self.clean_signal))) > 1000:
+            self.clean_signal = self.clean_signal / 1000.0
+            self.raw_signal = self.raw_signal / 1000.0
+
+        self.threshold_factor = 1.0
+>>>>>>> Stashed changes
         self.filtered_signal = self.apply_filter(self.raw_signal)
         self.SNR_raw = self.calculate_SNR(self.raw_signal)
         self.SNR_filtered = self.calculate_SNR(self.filtered_signal)
