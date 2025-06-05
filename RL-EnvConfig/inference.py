@@ -8,9 +8,13 @@ import os
 
 # --- Load signal data ---
 #df = pd.read_csv("Data/simulated_signal_data.csv")
-
-df = pd.read_csv("Data/rx_tx_data.csv").head(5000).rename(columns={'TX Magnitude': 'Noisy Signal', 'RX Magnitude': 'Clean Signal'})
-
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "..", "Data/"))
+try:
+    df = pd.read_csv(os.path.join(BASE_DIR, "rx_tx_data.csv")).head(5000).rename(columns={'TX Magnitude': 'Noisy Signal', 'RX Magnitude': 'Clean Signal'})
+except FileNotFoundError:
+    print("rx_tx_data.csv not found. Please ensure the file exists in the correct directory.")
+    exit(1)
 # Load trained SAC model
 model_path = os.path.join("models", "sac_noise_reduction_051325_2pm")
 model = SAC.load(model_path)

@@ -43,8 +43,12 @@ class RX(gr.top_block):
         tune_args = ['']
         settings = ['']
 
-        self.soapy_hackrf_source_0 = soapy.source(dev, "fc32", 1, 'Serial=2a8a8313',
-                                  stream_args, tune_args, settings)
+        try:
+            self.soapy_hackrf_source_0 = soapy.source(dev, "fc32", 1, 'Serial=2a8a8313',
+                                    stream_args, tune_args, settings)
+        except RuntimeError as e:
+            print(f"Error initializing RX source: {e}")
+            sys.exit(1)
         self.soapy_hackrf_source_0.set_sample_rate(0, samp_rate)
         self.soapy_hackrf_source_0.set_bandwidth(0, 0)
         self.soapy_hackrf_source_0.set_frequency(0, center_freq)

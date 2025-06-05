@@ -7,7 +7,13 @@ import time
 import sys
 sys.path.append('/home/nvidia/.local/lib/python3.6/site-packages')
 
-import board
+try:
+  import board
+except NotImplementedError as e:
+  print("Board module not available. Ensure you are running this on a Jetson TX2 with the correct libraries installed.")
+  board = None
+  sys.exit(1)
+  
 import busio
 from Adafruit_MCP9808 import MCP9808
 

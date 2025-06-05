@@ -11,14 +11,10 @@
 from gnuradio import analog
 from gnuradio import blocks
 from gnuradio import gr
-from gnuradio.filter import firdes
-from gnuradio.fft import window
 import sys
 import signal
-from argparse import ArgumentParser
-from gnuradio.eng_arg import eng_float, intx
-from gnuradio import eng_notation
 from gnuradio import soapy
+
 
 
 
@@ -44,8 +40,12 @@ class TX(gr.top_block):
         tune_args = ['']
         settings = ['']
 
-        self.soapy_hackrf_sink_0 = soapy.sink(dev, "fc32", 1, 'Serial=2a7f8313',
-                                  stream_args, tune_args, settings)
+        try:
+            self.soapy_hackrf_sink_0 = soapy.sink(dev, "fc32", 1, 'Serial=2a7f8313',
+                                    stream_args, tune_args, settings)
+        except RuntimeError as e:
+            print(f"Error initializing TX sink: {e}")
+            sys.exit(1)
         self.soapy_hackrf_sink_0.set_sample_rate(0, samp_rate)
         self.soapy_hackrf_sink_0.set_bandwidth(0, 0)
         self.soapy_hackrf_sink_0.set_frequency(0, center_freq)

@@ -18,7 +18,14 @@ dependencies:
   - clangxx
   - libcxx
   - hackrf
+  - pywavelets
+  - gnuradio
   - pip
   - pip:
       - adafruit-circuitpython-mcp9808
       - adafruit-blinka
+      - adafruit-platformdetect
+      - gymnasium
+
+# INSTALL DIREWCTLY ON JETSON:
+# pip install cupy-cuda102
