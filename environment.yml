@@ -19,5 +19,6 @@ dependencies:
   - libcxx
   - hackrf
   - pip
-  # - pip:
-  #     - some-custom-package  # (If you have pip-only dependencies)
+  - pip:
+      - adafruit-circuitpython-mcp9808
+      - adafruit-blinka

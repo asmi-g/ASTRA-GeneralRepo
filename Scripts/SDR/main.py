@@ -12,6 +12,7 @@ DATA_DIR = "Data/"
 TX_SCRIPT = "TX.py"
 RX_SCRIPT = "RX.py"
 ML_SCRIPT = "inference.py"
+TEMP_LOGGER_SCRIPT = "Scripts/SystemTesting/temperature_logger.py"
 CSV_FILE_PATH = os.path.join(DATA_DIR, "signal.csv")
 RUNTIME_SECONDS = 10  # duration to run TX/RX per cycle
 
@@ -91,6 +92,10 @@ def SDR_cycle():
 def main():
     install_requirements()
 
+    # Launch temperature logging script
+    print("Launching temperature logger...")
+    temp_logger_proc = run_script(TEMP_LOGGER_SCRIPT)
+
     # Launch ML inference script once
     print("Launching ML model...")
     ml_proc = run_script(ML_SCRIPT)
@@ -103,6 +108,9 @@ def main():
     except KeyboardInterrupt:
         print("Terminating Model Operation...")
         terminate_process(ml_proc)
+
+        print("Terminating temperature logging...")
+        terminate_process(temp_logger_proc)
 
 
 if __name__ == "__main__":
