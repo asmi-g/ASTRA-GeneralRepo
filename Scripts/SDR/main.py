@@ -108,6 +108,7 @@ def main():
     except KeyboardInterrupt:
         print("Terminating Model Operation...")
         terminate_process(ml_proc)
+
         print("Terminating temperature logging...")
         terminate_process(temp_logger_proc)
 
