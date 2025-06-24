@@ -43,6 +43,8 @@ mse = []
 print("Running inference using trained SAC model (continuous actions)...")
 for i in range(window_size, len(df)):  
     # Predict continuous action
+    # Ensure correct shape and type for SAC model
+    state = np.asarray(state, dtype=np.float32).reshape(1, -1)
     action, _ = model.predict(state, deterministic=True)
     actions.append(action[0])  # Extract scalar from array
 

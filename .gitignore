@@ -211,3 +211,4 @@ Training/Logs/evaluations_051225_6pm.npz
 Training/Logs/SAC_1/events.out.tfevents.1747091802.DESKTOP-DGMFJ5G.16116.0
 Training/Logs/SAC_051225_6pm/events.out.tfevents.1747088603.DESKTOP-DGMFJ5G.8576.0
 RL-EnvConfig/misc.py
+Data/rx_tx_data_digitalLNA_1.xlsx
