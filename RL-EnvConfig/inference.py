@@ -12,7 +12,7 @@ import os
 df = pd.read_csv("Data/signal.csv").head(5000).rename(columns={'TX Magnitude': 'Noisy Signal', 'RX Magnitude': 'Clean Signal'})
 
 # Load trained SAC model
-model_path = os.path.join("models", "sac_noise_reduction_051325_2pm")
+model_path = os.path.join("../../models", "sac_noise_reduction_051325_2pm")
 model = SAC.load(model_path)
 
 # Initialize environment
