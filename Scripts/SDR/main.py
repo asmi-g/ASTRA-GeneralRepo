@@ -11,7 +11,7 @@ import csv
 DATA_DIR = "Data/"
 TX_SCRIPT = "TX.py"
 RX_SCRIPT = "RX.py"
-ML_SCRIPT = "inference.py"
+ML_SCRIPT = "../../RL-EnvConfig/inference.py"
 TEMP_LOGGER_SCRIPT = "Scripts/SystemTesting/temperature_logger.py"
 CSV_FILE_PATH = os.path.join(DATA_DIR, "signal.csv")
 RUNTIME_SECONDS = 10  # duration to run TX/RX per cycle
