@@ -43,7 +43,7 @@ mse = []
 print("Running inference using trained SAC model (continuous actions)...")
 for i in range(window_size, len(df)):  
     # Predict continuous action
-    state_original = np.expand_dims(state, axis=0).tolist()
+    state = np.expand_dims(state, axis=0).tolist()
     action, _ = model.predict(state, deterministic=True)
     actions.append(action[0])  # Extract scalar from array
 
