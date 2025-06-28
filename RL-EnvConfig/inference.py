@@ -43,6 +43,8 @@ mse = []
 print("Running inference using trained SAC model (continuous actions)...")
 for i in range(window_size, len(df)):  
     # Predict continuous action
+    print("DEBUG state type:", type(state))
+    print("DEBUG state content:", state)
     state = np.array(state, dtype=np.float32)
     state = np.expand_dims(state, axis=0)
     action, _ = model.predict(state, deterministic=True)
