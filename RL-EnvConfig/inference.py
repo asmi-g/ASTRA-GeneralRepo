@@ -12,6 +12,13 @@ df = pd.read_csv("Data/signal.csv").head(5000).rename(columns={'TX Magnitude': '
 
 #df = pd.read_csv("C:/Users/imanq/Documents/Programs/GitHub/ASTRA-GeneralRepo/Data/simulated_signal_data.csv").head(5000).rename(columns={"TX Magnitude": "Noisy Signal", "RX Magnitude": "Clean Signal"})
 
+if df.empty:
+    print("CSV file was empty—generating random fallback data.")
+    df = pd.DataFrame({
+        'Noisy Signal': np.random.normal(0, 1, 20),
+        'Clean Signal': np.random.normal(0, 1, 20)
+    })
+
 custom_objects = {
     "lr_schedule": lambda x: 0.003,
     "clip_range": lambda x: 0.02
