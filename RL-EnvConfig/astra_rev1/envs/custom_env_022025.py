@@ -1,6 +1,6 @@
 #step 1: creating custom environment by subclassing gym.Env
-import gymnasium as gym
-from gymnasium import spaces
+import gym #nasium as gym
+from gym import spaces
 import numpy as np
 import pywt
 
@@ -8,7 +8,9 @@ class NoiseReductionEnv(gym.Env):
     def __init__(self):
         super().__init__()
 
-        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(9,), dtype=np.float32)
+        #self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(9,), dtype=np.float32)
+        self.observation_space = spaces.Box(low=-1e6 * np.ones(9),high=1e6 * np.ones(9), dtype=np.float32)
+
         self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(1,), dtype=np.float32)
 
         self.step_size = 0.1
@@ -47,9 +49,8 @@ class NoiseReductionEnv(gym.Env):
         noise_power = np.mean(noise**2)
         return 10 * np.log10((signal_power + 1e-10) / (noise_power + 1e-10))
 
-    def reset(self, seed=None, options=None, clean_signal=None, noisy_signal=None):
+    def reset(self, clean_signal=None, noisy_signal=None):
         self.no_signal = False
-        super().reset(seed=seed)
         if clean_signal is None or noisy_signal is None:
             self.no_signal = True
             print("signal not provided; generating random signal")
@@ -59,9 +60,11 @@ class NoiseReductionEnv(gym.Env):
             self.clean_signal = clean_signal
             self.raw_signal = noisy_signal
         
-        if np.max(np.abs(self.clean_signal)) > 1000:
-            self.clean_signal = self.clean_signal / 1000.0
-            self.raw_signal = self.raw_signal / 1000.0
+        scale = np.max(np.abs(self.clean_signal))
+        if scale > 0:
+            self.clean_signal /= scale
+            self.raw_signal /= scale
+
 
         self.threshold_factor = 1.0
         self.filtered_signal = self.apply_filter(self.raw_signal)
@@ -83,7 +86,7 @@ class NoiseReductionEnv(gym.Env):
             self.prev_reward,
             np.mean(self.reward_history) if self.reward_history else 0.0
         ], dtype=np.float32)
-        return state, {}
+        return state
 
     def step(self, action):
         self.iteration += 1
@@ -96,21 +99,27 @@ class NoiseReductionEnv(gym.Env):
         snr_filtered = self.calculate_SNR(self.clean_signal, self.filtered_signal)
 
         #reward = np.tanh(0.5 * (snr_filtered - snr_raw))
-        reward = snr_filtered - snr_raw
 
-        # Positive reward component
-        if reward > 0:
-            reward += 0.2 * reward  # encourage even modest improvements
+        # reward = snr_filtered - snr_raw
+        # if reward > 0:
+        #     reward += 0.2 * reward
+        # bias_penalty = np.abs(np.mean(self.filtered_signal - self.clean_signal))
+        # reward -= 0.05 * bias_penalty
+        # if abs(self.threshold_factor) < 0.01:
+        #     reward -= 0.02
 
-        # Penalize for distortion
-        bias_penalty = np.abs(np.mean(self.filtered_signal - self.clean_signal))
-        reward -= 0.05 * bias_penalty
+        snr_gain = snr_filtered - snr_raw
+        mae = np.mean(np.abs(self.filtered_signal - self.clean_signal))
+        clipping_threshold = 0.95 * np.max(np.abs(self.clean_signal))
+        clipping_penalty = np.mean(np.abs(self.filtered_signal) > clipping_threshold)
+        smoothness_penalty = np.mean(np.abs(np.diff(self.filtered_signal)))
 
-
-        # Discourage unnecessary filtering (but not too hard)
-        if abs(self.threshold_factor) < 0.01:
-            reward -= 0.02
-
+        reward = (
+            +1.0 * snr_gain
+            -0.5 * mae
+            -0.3 * clipping_penalty
+            -0.1 * smoothness_penalty
+        )
 
         self.reward_history.append(reward)
         self.prev_reward = reward
@@ -158,7 +167,7 @@ class NoiseReductionEnv(gym.Env):
             else:
                 done = False  # Not enough data to determine plateau yet
 
-        return state, reward, done, False, info
+        return state, reward, done, info
 
     def close(self):
         pass

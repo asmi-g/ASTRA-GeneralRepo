@@ -1,28 +1,138 @@
-import pandas as pd
+# reward_sweep.py
+import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
+import random
+from astra_rev1.envs import NoiseReductionEnv
 
-# Load both CSVs
-df1 = pd.read_csv("dqn_snr_improvement_log.csv")  # e.g., from model A
-df2 = pd.read_csv("sac_snr_improvement_log.csv")  # e.g., from model B
+# Create environment instance
+env = NoiseReductionEnv()
 
-# Ensure time step is aligned (optional but recommended)
-if "Time Step" not in df1.columns:
-    df1["Time Step"] = range(len(df1))
-if "Time Step" not in df2.columns:
-    df2["Time Step"] = range(len(df2))
+# Use default random signal
+state = env.reset()
 
-# Plot SNR Improvement from both
-plt.figure(figsize=(10, 5))
-plt.plot(df1["Time Step"], df1["SNR Improvement"], label="DQN", color = 'orange')
-plt.plot(df2["Time Step"], df2["SNR Improvement"], label="SAC", color = 'blue')
-plt.axhline(y=0, color='gray', linestyle='--')
+def generate_synthetic_signal(signal_type=None, noise_level=None, length=100):
+    t = np.linspace(0, 1, length)
+    signal_type = signal_type or random.choice(["sine", "square", "sawtooth", "random"])
+    noise_level = noise_level if noise_level is not None else np.random.uniform(0.2, 0.5)
 
-plt.title("SNR Improvement: DQN vs. SAC")
-plt.xlabel("Time Step")
-plt.ylabel("SNR Improvement (dB)")
+    if signal_type == "sine":
+        clean = np.sin(2 * np.pi * 5 * t)
+    elif signal_type == "square":
+        clean = np.sign(np.sin(2 * np.pi * 5 * t))
+    elif signal_type == "sawtooth":
+        clean = 2 * (t * 5 % 1) - 1
+    elif signal_type == "random":
+        clean = np.random.uniform(-1, 1, size=length)
+    else:
+        raise ValueError("Unknown signal type!")
+
+    noisy = clean + np.random.normal(0, noise_level, size=length)
+    return clean, noisy
+
+# Or you can generate your own:
+clean_signal, noisy_signal = generate_synthetic_signal()
+env.reset(clean_signal=clean_signal, noisy_signal=noisy_signal)
+
+thresholds = np.linspace(0.0, 5.0, num=50)
+
+results = []
+
+for t in thresholds:
+    filtered = env.apply_filter(env.raw_signal, threshold_factor=t)
+
+    snr_raw = env.calculate_SNR(env.clean_signal, env.raw_signal)
+    snr_filtered = env.calculate_SNR(env.clean_signal, filtered)
+    snr_gain = snr_filtered - snr_raw
+
+    mae = np.mean(np.abs(filtered - env.clean_signal))
+    clipping_threshold = 0.95 * np.max(np.abs(env.clean_signal))
+    clipping_penalty = np.mean(np.abs(filtered) > clipping_threshold)
+    smoothness_penalty = np.mean(np.abs(np.diff(filtered)))
+
+    reward = (
+        +1.0 * snr_gain
+        -0.5 * mae
+        -0.3 * clipping_penalty
+        -0.1 * smoothness_penalty
+    )
+
+    results.append({
+        "threshold": t,
+        "snr_gain": snr_gain,
+        "mae": mae,
+        "clipping_penalty": clipping_penalty,
+        "smoothness_penalty": smoothness_penalty,
+        "reward": reward
+    })
+
+# Convert to DataFrame
+df = pd.DataFrame(results)
+plt.figure(figsize=(12, 6))
+
+# Plot Reward vs Threshold
+plt.subplot(2, 1, 1)
+plt.plot(df["threshold"], df["reward"], label="Reward")
+plt.xlabel("Threshold Factor")
+plt.ylabel("Reward")
+plt.title("Reward Function Sweep")
 plt.legend()
-plt.tight_layout()
+plt.grid(True)
+
+# Optional: Plot all components
+plt.subplot(2, 1, 2)
+plt.plot(df["threshold"], df["snr_gain"], label="SNR Gain")
+plt.plot(df["threshold"], df["mae"], label="MAE")
+plt.plot(df["threshold"], df["clipping_penalty"], label="Clipping Fraction")
+plt.plot(df["threshold"], df["smoothness_penalty"], label="Smoothness Penalty")
+plt.xlabel("Threshold Factor")
+plt.ylabel("Metric Value")
+plt.title("Reward Components vs Threshold Factor")
+plt.legend()
+plt.grid(True)
 plt.show()
+
+# Optional: Save results to CSV
+#df.to_csv("reward_sweep_results.csv", index=False)
+
+print("Sweep completed and saved.")
+
+
+
+
+# import pandas as pd
+# import matplotlib.pyplot as plt
+# import os
+
+# from stable_baselines3 import SAC
+
+# model_path = os.path.join("C:/Users/imanq/Documents/Programs/GitHub/ASTRA-GeneralRepo/models/sac_noise_reduction_051325_2pm")
+# model = SAC.load(model_path)
+# model.save("sac_noise_reduction_051325_2pm_original")
+# model.save("sac_noise_reduction_py36", pickle_protocol=4)
+
+# # Load both CSVs
+# df1 = pd.read_csv("dqn_snr_improvement_log.csv")  # e.g., from model A
+# df2 = pd.read_csv("sac_snr_improvement_log.csv")  # e.g., from model B
+
+# # Ensure time step is aligned (optional but recommended)
+# if "Time Step" not in df1.columns:
+#     df1["Time Step"] = range(len(df1))
+# if "Time Step" not in df2.columns:
+#     df2["Time Step"] = range(len(df2))
+
+# # Plot SNR Improvement from both
+# plt.figure(figsize=(10, 5))
+# plt.plot(df1["Time Step"], df1["SNR Improvement"], label="DQN", color = 'orange')
+# plt.plot(df2["Time Step"], df2["SNR Improvement"], label="SAC", color = 'blue')
+# plt.axhline(y=0, color='gray', linestyle='--')
+
+# plt.title("SNR Improvement: DQN vs. SAC")
+# plt.xlabel("Time Step")
+# plt.ylabel("SNR Improvement (dB)")
+# plt.legend()
+# plt.tight_layout()
+# plt.show()
 
 
 

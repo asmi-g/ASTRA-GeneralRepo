@@ -99,12 +99,16 @@ def main():
     # Launch ML inference script once
     print("Launching ML model...")
     ml_proc = run_script(ML_SCRIPT)
+    print("ML model launched.")
 
     # SDR capture loop
     try:
         while True:
+            print("Starting SDR cycle...")
             SDR_cycle()
-            time.sleep(2)  # Optional delay between cycles
+            print("Completed SDR cycle.")
+            time.sleep(2)
+
     except KeyboardInterrupt:
         print("Terminating Model Operation...")
         terminate_process(ml_proc)

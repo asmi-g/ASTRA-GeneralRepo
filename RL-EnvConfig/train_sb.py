@@ -6,49 +6,61 @@ import numpy as np
 import random
 from stable_baselines3 import SAC
 from stable_baselines3.common.env_checker import check_env
-from astra_rev1.envs import NoiseReductionEnv
+from astra_rev1.envs import NoiseReductionEnv  # adjust import if needed
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.callbacks import EvalCallback, CheckpointCallback
 from stable_baselines3.common.monitor import Monitor
 
-env = Monitor(NoiseReductionEnv())
+# Create environment
+env = NoiseReductionEnv()
+env = Monitor(env)
+
+# Check environment
 check_env(env, warn=True)
 
+# Set seeds
 seed = 42
 np.random.seed(seed)
+random.seed(seed)
 
-log_path = os.path.join('Training', 'Logs')
-os.makedirs(log_path, exist_ok=True)
-os.makedirs("models", exist_ok=True)
+# Create log directories
+# log_path = os.path.join('Training', 'Logs')
+# if not os.path.exists(log_path):
+#     os.makedirs(log_path)
+if not os.path.exists("models"):
+    os.makedirs("models")
 
-model = SAC("MlpPolicy", env, verbose=1, tensorboard_log=log_path)
+# Initialize model
+model = SAC("MlpPolicy", env, verbose=1)
+
+# Create callbacks (note: SB3 1.3 does not have 'name_prefix' in CheckpointCallback)
 eval_callback = EvalCallback(
     env,
     best_model_save_path='models/best_model',
-    log_path='Training/Logs',
+    #log_path=log_path,
     eval_freq=1000,
     deterministic=True,
     render=False
 )
-checkpoint_callback = CheckpointCallback(save_freq=10000, save_path='models/', name_prefix='sac_checkpoint')
+checkpoint_callback = CheckpointCallback(
+    save_freq=10000,
+    save_path='models/'
+)
 
-model.learn(total_timesteps=100000, callback=[eval_callback, checkpoint_callback])
+# Train the model
+model.learn(total_timesteps=10000, callback=[eval_callback, checkpoint_callback])
 
+# Save model
 model.save("models/sac_noise_reduction")
 print("Model saved to 'models/sac_noise_reduction'")
 
-mean_reward, std_reward = evaluate_policy(model, env, n_eval_episodes=10, return_episode_rewards=False)
-print(f"Mean reward: {mean_reward} ± {std_reward}")
+# Evaluate model
+mean_reward, std_reward = evaluate_policy(model, env, n_eval_episodes=10)
+print("Mean reward: {:.2f} ± {:.2f}".format(mean_reward, std_reward))
 
-episode_rewards = evaluate_policy(model, env, n_eval_episodes=10, return_episode_rewards=True)
-print("Evaluation rewards over episodes: ", episode_rewards)
 end_time = time.time()
 elapsed_time = end_time - start_time
-print(f"\nTotal runtime: {elapsed_time:.2f} seconds")
-
-
-
-
+print("\nTotal runtime: {:.2f} seconds".format(elapsed_time))
 
 # 
 # def generate_synthetic_signal(signal_type=None, noise_level=None, length=100):
