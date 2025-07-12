@@ -22,7 +22,13 @@ RUNTIME_SECONDS = 10  # duration to run TX/RX per cycle
 # - Integrate AM scripts, address throttle block error and rerun on WSL
 # - Integrate timed operation for flight
 
-
+def initialize_csv(csv_file_path):
+    """Create an empty CSV file with header if it doesn't exist."""
+    if not os.path.exists(csv_file_path):
+        print("Creating new CSV file with header...")
+        with open(csv_file_path, mode='w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(["Index", "TX Real", "TX Imag", "TX Magnitude", "RX Real", "RX Imag", "RX Magnitude"])
 
 def install_requirements():
     try:
@@ -36,7 +42,6 @@ def run_script(script_path):
         return subprocess.Popen(["python", script_path])
     else:
         return subprocess.Popen(["python3", script_path], preexec_fn=os.setsid)
-
 
 def terminate_process(proc):
     if platform.system() == "Windows":
@@ -90,6 +95,7 @@ def SDR_cycle():
 
 
 def main():
+    initialize_csv(CSV_FILE_PATH)
     install_requirements()
 
     # Launch temperature logging script
