@@ -18,7 +18,7 @@ custom_objects = {
 }
 
 # Load trained SAC model
-model_path = os.path.join("../models", "sac_noise_reduction_071225_400")
+model_path = os.path.join("models", "sac_noise_reduction_071225_400")
 model = SAC.load(model_path, custom_objects=custom_objects)
 
 # Initialize environment
