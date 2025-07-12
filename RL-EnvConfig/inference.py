@@ -18,7 +18,9 @@ custom_objects = {
 }
 
 # Load trained SAC model
-model_path = os.path.join("models", "sac_noise_reduction_071225_400")
+script_dir = os.path.dirname(os.path.abspath(__file__))
+model_path = os.path.normpath(os.path.join(script_dir, "../models/sac_noise_reduction_071225_400.zip"))
+
 model = SAC.load(model_path, custom_objects=custom_objects)
 
 # Initialize environment
