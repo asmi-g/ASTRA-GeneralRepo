@@ -88,24 +88,40 @@ def reset_hackrfs():
     subprocess.call(["hackrf_cpldjtag", "--reset"])
     time.sleep(3)
 
+def can_open_hackrf(serial):
+    try:
+        out = subprocess.check_output(["hackrf_info"]).decode()
+        return serial in out
+    except:
+        return False
+
 def check_sdrs():
-    # ---------------------
-    # Check + Fix Loop
-    # ---------------------
-    MAX_ATTEMPTS = 3
-    for attempt in range(MAX_ATTEMPTS):
-        print(f"[INFO] Checking HackRF devices (Attempt {attempt + 1}/{MAX_ATTEMPTS})...")
+    attempt = 1
+    while True:
+        print(f"[INFO] Checking HackRF devices (Attempt {attempt})...")
         devices = get_soapy_devices()
 
-        if not needs_reset(devices):
-            print("[INFO] HackRF devices recognized correctly.")
-            break
+        if needs_reset(devices):
+            print("[WARNING] HackRFs not enumerated properly. Attempting reset.")
+            reset_hackrfs()
+            time.sleep(2)
+            attempt += 1
+            continue
 
-        print("[WARNING] HackRFs not enumerated properly. Attempting reset.")
-        reset_hackrfs()
-    else:
-        print("[ERROR] Failed to detect two distinct HackRF devices after reset attempts.")
-        exit(1)
+        # Both devices enumerated — now check if we can open them
+        print("[INFO] HackRFs found. Checking openability...")
+        time.sleep(1)  # give some USB time
+
+        all_open = all(can_open_hackrf(serial) for serial in EXPECTED_SERIALS)
+        if all_open:
+            print("[INFO] HackRF devices recognized AND openable.")
+            break
+        else:
+            print("[WARNING] HackRF devices cannot be opened. Resetting again.")
+            reset_hackrfs()
+            time.sleep(2)
+            attempt += 1
+
 
 
 def install_requirements():
@@ -123,10 +139,19 @@ def run_script(script_path):
 
 
 def terminate_process(proc):
-    if platform.system() == "Windows":
-        proc.terminate()
-    else:
-        os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+    if proc.poll() is not None:
+        # Process already terminated
+        return
+
+    try:
+        if platform.system() == "Windows":
+            proc.terminate()
+        else:
+            os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+    except ProcessLookupError:
+        # Process already exited
+        pass
+
 
 
 def save_to_csv(rx_file_path, tx_file_path, csv_file_path):
@@ -158,10 +183,23 @@ def save_to_csv(rx_file_path, tx_file_path, csv_file_path):
 
 
 def SDR_cycle():
+    print("[INFO] Checking SDRs before starting TX/RX...")
+    check_sdrs()  # <-- Add this line to verify and reset HackRFs if needed
+
+
     print("Launching TX and RX scripts...")
     tx_proc = run_script(TX_SCRIPT)
     rx_proc = run_script(RX_SCRIPT)
-    
+
+    # Wait briefly to allow for early crash
+    time.sleep(3)
+    if tx_proc.poll() is not None or rx_proc.poll() is not None:
+        print("[ERROR] One or both SDR scripts crashed at startup. Retrying...")
+        terminate_process(tx_proc)
+        terminate_process(rx_proc)
+        reset_hackrfs()
+        time.sleep(2)
+        return  # Exit this cycle early    
 
     print(f"Running for {RUNTIME_SECONDS} seconds...")
     time.sleep(RUNTIME_SECONDS)
