@@ -1,30 +1,40 @@
-import pandas as pd
-import matplotlib.pyplot as plt
+from stable_baselines3 import SAC
+import cloudpickle
 
-# Load both CSVs
-df1 = pd.read_csv("dqn_snr_improvement_log.csv")  # e.g., from model A
-df2 = pd.read_csv("sac_snr_improvement_log.csv")  # e.g., from model B
+# Load the model
+model = SAC.load("models/sac_noise_reduction_071225_8pm_10k.zip")
 
-# Ensure time step is aligned (optional but recommended)
-if "Time Step" not in df1.columns:
-    df1["Time Step"] = range(len(df1))
-if "Time Step" not in df2.columns:
-    df2["Time Step"] = range(len(df2))
+# Save manually with pickle protocol 4
+with open("models/sac_noise_reduction_py37.pkl", "wb") as f:
+    cloudpickle.dump(model, f, protocol=4)
 
-# Plot SNR Improvement from both
-plt.figure(figsize=(10, 5))
-plt.plot(df1["Time Step"], df1["SNR Improvement"], label="DQN", color = 'orange')
-plt.plot(df2["Time Step"], df2["SNR Improvement"], label="SAC", color = 'blue')
-plt.axhline(y=0, color='gray', linestyle='--')
+print("Model re-saved with pickle protocol 4.")
 
-plt.title("SNR Improvement: DQN vs. SAC")
-plt.xlabel("Time Step")
-plt.ylabel("SNR Improvement (dB)")
-plt.legend()
-plt.tight_layout()
-plt.show()
+# import pandas as pd
+# import matplotlib.pyplot as plt
 
+# # Load both CSVs
+# df1 = pd.read_csv("dqn_snr_improvement_log.csv")  # e.g., from model A
+# df2 = pd.read_csv("sac_snr_improvement_log.csv")  # e.g., from model B
 
+# # Ensure time step is aligned (optional but recommended)
+# if "Time Step" not in df1.columns:
+#     df1["Time Step"] = range(len(df1))
+# if "Time Step" not in df2.columns:
+#     df2["Time Step"] = range(len(df2))
+
+# # Plot SNR Improvement from both
+# plt.figure(figsize=(10, 5))
+# plt.plot(df1["Time Step"], df1["SNR Improvement"], label="DQN", color = 'orange')
+# plt.plot(df2["Time Step"], df2["SNR Improvement"], label="SAC", color = 'blue')
+# plt.axhline(y=0, color='gray', linestyle='--')
+
+# plt.title("SNR Improvement: DQN vs. SAC")
+# plt.xlabel("Time Step")
+# plt.ylabel("SNR Improvement (dB)")
+# plt.legend()
+# plt.tight_layout()
+# plt.show()
 
 # from stable_baselines3 import SAC
 # from astra_rev1.envs import NoiseReductionEnv
