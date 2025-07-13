@@ -43,7 +43,7 @@ class RX(gr.top_block):
         tune_args = ['']
         settings = ['']
 
-        self.soapy_hackrf_source_0 = soapy.source(dev, "fc32", 1, 'Serial=2a8a8313',
+        self.soapy_hackrf_source_0 = soapy.source(dev, "fc32", 1, "",
                                   stream_args, tune_args, settings)
         self.soapy_hackrf_source_0.set_sample_rate(0, samp_rate)
         self.soapy_hackrf_source_0.set_bandwidth(0, 0)

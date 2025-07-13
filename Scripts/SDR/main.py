@@ -12,7 +12,7 @@ DATA_DIR = "Data/"
 TX_SCRIPT = "TX.py"
 RX_SCRIPT = "RX.py"
 ML_SCRIPT = "../../RL-EnvConfig/inference.py"
-TEMP_LOGGER_SCRIPT = "Scripts/SystemTesting/temperature_logger.py"
+TEMP_LOGGER_SCRIPT = "../SystemTesting/temperature_logger.py"
 CSV_FILE_PATH = os.path.join(DATA_DIR, "signal.csv")
 RUNTIME_SECONDS = 10  # duration to run TX/RX per cycle
 
@@ -90,8 +90,6 @@ def SDR_cycle():
 
 
 def main():
-    install_requirements()
-
     # Launch temperature logging script
     print("Launching temperature logger...")
     temp_logger_proc = run_script(TEMP_LOGGER_SCRIPT)
