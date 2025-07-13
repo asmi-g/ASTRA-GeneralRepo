@@ -44,7 +44,7 @@ class TX(gr.top_block):
         tune_args = ['']
         settings = ['']
 
-        self.soapy_hackrf_sink_0 = soapy.sink(dev, "fc32", 1, "",
+        self.soapy_hackrf_sink_0 = soapy.sink(dev, "fc32", 1, 'Serial=0000000000000000a18c63dc2a7f8313',
                                   stream_args, tune_args, settings)
         self.soapy_hackrf_sink_0.set_sample_rate(0, samp_rate)
         self.soapy_hackrf_sink_0.set_bandwidth(0, 0)
