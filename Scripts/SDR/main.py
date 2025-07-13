@@ -6,12 +6,27 @@ import os
 import signal
 import platform
 import numpy as np
-import csv
 
-DATA_DIR = "Data/"
-TX_SCRIPT = "TX.py"
-RX_SCRIPT = "RX.py"
-ML_SCRIPT = "../../RL-EnvConfig/inference.py"
+# try:
+#     import cupy as np # CuPy is a GPU-accelerated library similar to NumPy
+#     print("Using CuPy (GPU)")
+# except ImportError:
+#     import numpy as np
+#     print("Using NumPy (CPU fallback)") 
+import csv
+BASE_DIR = "/home/nvidia/Projects/ASTRA/ASTRA-GeneralRepo/"
+print(f"Base directory: {BASE_DIR}")
+
+DATA_DIR = os.path.join(BASE_DIR, "Scripts/SDR/Data/")
+print(f"Data directory: {DATA_DIR}")
+
+TX_SCRIPT = os.path.join(BASE_DIR, "Scripts/SDR/TX.py")
+print(f"TX script: {TX_SCRIPT}")
+RX_SCRIPT = os.path.join(BASE_DIR, "Scripts/SDR/RX.py")
+print(f"RX script: {RX_SCRIPT}")
+
+ML_SCRIPT = os.path.join(BASE_DIR, "RL-EnvConfig/inference.py")
+print(f"ML script: {ML_SCRIPT}")
 TEMP_LOGGER_SCRIPT = "../SystemTesting/temperature_logger.py"
 CSV_FILE_PATH = os.path.join(DATA_DIR, "signal.csv")
 RUNTIME_SECONDS = 10  # duration to run TX/RX per cycle
@@ -21,7 +36,6 @@ RUNTIME_SECONDS = 10  # duration to run TX/RX per cycle
 # - Integrate Chelsea's comments from previous pr
 # - Integrate AM scripts, address throttle block error and rerun on WSL
 # - Integrate timed operation for flight
-
 
 
 def install_requirements():
