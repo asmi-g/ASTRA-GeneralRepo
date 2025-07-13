@@ -5,58 +5,28 @@ import matplotlib.pyplot as plt
 from stable_baselines3 import SAC
 from astra_rev1.envs import NoiseReductionEnv
 import os
+import time
 
-# --- Load signal data ---
-#df = pd.read_csv("Data/signal.csv").head(5000).rename(columns={'TX Magnitude': 'Noisy Signal', 'RX Magnitude': 'Clean Signal'})
-#df = pd.read_csv("Data/simulated_signal_data.csv").head(5000).rename(columns={"TX Magnitude": "Noisy Signal", "RX Magnitude": "Clean Signal"})
-
-csv_path = "../../Data/signal.csv"
-
-try:
-    df = pd.read_csv(csv_path).head(5000).rename(columns={
-        'TX Magnitude': 'Noisy Signal',
-        'RX Magnitude': 'Clean Signal'
-    })
-except (pd.errors.EmptyDataError, FileNotFoundError):
-    print("Empty signal.csv")
-    exit()
-
-if len(df) < 10:
-    print("Insufficient data (< 10 data points)")
-    exit()
-
+# Load SAC model
 custom_objects = {
     "lr_schedule": lambda x: 0.003,
     "clip_range": lambda x: 0.02
 }
 
-# Load trained SAC model
 script_dir = os.path.dirname(os.path.abspath(__file__))
 model_path = os.path.normpath(os.path.join(script_dir, "../models/sac_noise_reduction_071225_10pm_10k.zip"))
-
 model = SAC.load(model_path, custom_objects=custom_objects)
-
-# import cloudpickle
-
-# script_dir = os.path.dirname(os.path.abspath(__file__))
-# model_path = os.path.join(script_dir, "../models/sac_noise_reduction_py37.pkl")
-
-# with open(model_path, "rb") as f:
-#     model = cloudpickle.load(f)
 
 # Initialize environment
 env = NoiseReductionEnv()
 
-# Sliding window parameters
+# Parameters
 window_size = 10
-current_window_clean = df.iloc[:window_size]["Clean Signal"].tolist()
-current_window_noisy = df.iloc[:window_size]["Noisy Signal"].tolist()
+csv_path = "../../Data/signal.csv"
+poll_interval = 2      # seconds between polls
+timeout_seconds = 10   # time to wait for new data before exiting
 
-# Reset environment with initial state
-state = env.reset(clean_signal=np.array(current_window_clean),
-                  noisy_signal=np.array(current_window_noisy))
-
-# --- Tracking metrics ---
+# Tracking
 actions = []
 rewards = []
 snr_raw_list = []
@@ -69,95 +39,108 @@ thresholds = []
 mse = []
 results_rows = []
 
-print("Running inference using trained SAC model (continuous actions)...")
-for i in range(window_size, len(df)):
-    # Predict continuous action
-    state = np.expand_dims(state, axis=0)
-    action, _ = model.predict(state, deterministic=True)
-    actions.append(action[0])
+last_processed_index = window_size
+last_update_time = time.time()
+done = False
 
-    # Step the environment
-    next_state, reward, done, info = env.step(action)
+print("Waiting for data to appear...")
 
-    # Extract useful info
-    snr_raw = info["SNR_raw"]
-    snr_filtered = info["SNR_filtered"]
-    filtered_signal = info["filtered_signal"]
-    t_factor = info["threshold_factor"]
+while not done:
+    # Load the latest CSV
+    try:
+        df = pd.read_csv(csv_path).rename(columns={
+            'TX Magnitude': 'Noisy Signal',
+            'RX Magnitude': 'Clean Signal'
+        })
+    except (pd.errors.EmptyDataError, FileNotFoundError):
+        print("signal.csv not ready. Retrying...")
+        time.sleep(poll_interval)
+        continue
 
-    rewards.append(reward)
-    thresholds.append(t_factor)
-    snr_raw_list.append(snr_raw)
-    snr_filtered_list.append(snr_filtered)
-    snr_improvement.append(snr_filtered_list[-1] - snr_raw_list[-1])
-    mse.append(np.square(np.subtract(snr_filtered, snr_raw)).mean())
+    # Check if there is enough data
+    if len(df) < window_size:
+        print("Not enough data yet...")
+        time.sleep(poll_interval)
+        continue
 
-    clean_signal_data.extend(info["clean_signal"])
-    noisy_signal_data.extend(info["noisy_signal"])
-    filtered_signal_data.extend(filtered_signal)
+    # Check for new data
+    if last_processed_index >= len(df):
+        if time.time() - last_update_time > timeout_seconds:
+            print("No new data detected for timeout period. Exiting.")
+            break
+        else:
+            time.sleep(poll_interval)
+            continue
 
-    print(f"Rows {i-window_size, i} | Action: {action} | Reward: {reward:.4f} | SNR Improvement: {snr_improvement[-1]:.2f} | SNR Raw: {snr_raw:.2f} | SNR Filtered: {snr_filtered:.2f} | Done: {done} | filtered signal: {np.mean(filtered_signal):.4f} | clean signal: {np.mean(current_window_clean):.4f} | threshold factor: {t_factor:.4f}")
+    # New data is available
+    last_update_time = time.time()
 
-    results_rows.append({
-        "window": f"({i - window_size}, {i})",
-        "action": action,
-        "reward": reward,
-        "snr_improvement": snr_improvement[-1],
-        "threshold_factor": t_factor
-    })
+    while last_processed_index < len(df):
+        i = last_processed_index
+        current_window_clean = df.iloc[i - window_size:i]["Clean Signal"].tolist()
+        current_window_noisy = df.iloc[i - window_size:i]["Noisy Signal"].tolist()
 
-    # Update sliding window
-    current_window_clean.pop(0)
-    current_window_noisy.pop(0)
-    current_window_clean.append(df.iloc[i]["Clean Signal"])
-    current_window_noisy.append(df.iloc[i]["Noisy Signal"])
-    env.set_signal_window(np.array(current_window_clean), np.array(current_window_noisy))
+        # For the first iteration, reset the environment
+        if i == window_size:
+            state = env.reset(clean_signal=np.array(current_window_clean),
+                              noisy_signal=np.array(current_window_noisy))
 
-    # Update state
-    state = next_state
+        # Prepare state
+        state = np.expand_dims(state, axis=0)
+        action, _ = model.predict(state, deterministic=True)
 
-    if done:
-        print(f"Early termination at index {i}")
-        state = env.reset(clean_signal=np.array(current_window_clean),
-                          noisy_signal=np.array(current_window_noisy))
-        break
+        next_state, reward, done, info = env.step(action)
+
+        snr_raw = info["SNR_raw"]
+        snr_filtered = info["SNR_filtered"]
+        filtered_signal = info["filtered_signal"]
+        t_factor = info["threshold_factor"]
+
+        rewards.append(reward)
+        thresholds.append(t_factor)
+        snr_raw_list.append(snr_raw)
+        snr_filtered_list.append(snr_filtered)
+        snr_improvement.append(snr_filtered_list[-1] - snr_raw_list[-1])
+        mse.append(np.square(np.subtract(snr_filtered, snr_raw)).mean())
+
+        clean_signal_data.extend(info["clean_signal"])
+        noisy_signal_data.extend(info["noisy_signal"])
+        filtered_signal_data.extend(filtered_signal)
+
+        print(f"Rows {i-window_size, i} | Action: {action} | Reward: {reward:.4f} | SNR Improvement: {snr_improvement[-1]:.2f} | SNR Raw: {snr_raw:.2f} | SNR Filtered: {snr_filtered:.2f} | Done: {done} | filtered signal: {np.mean(filtered_signal):.4f} | clean signal: {np.mean(current_window_clean):.4f} | threshold factor: {t_factor:.4f}")
+
+        results_rows.append({
+            "window": f"({i - window_size}, {i})",
+            "action": action,
+            "reward": reward,
+            "snr_improvement": snr_improvement,
+            "threshold_factor": t_factor
+        })
+
+        # Update sliding window for environment
+        current_window_clean.pop(0)
+        current_window_noisy.pop(0)
+        current_window_clean.append(df.iloc[i]["Clean Signal"])
+        current_window_noisy.append(df.iloc[i]["Noisy Signal"])
+
+        env.set_signal_window(np.array(current_window_clean), np.array(current_window_noisy))
+
+        # Update state
+        state = next_state
+
+        # Increment index
+        last_processed_index += 1
+
+        if done:
+            print(f"Early termination signaled by environment at index {i}.")
+            break
+
+    time.sleep(poll_interval)
 
 env.close()
-print("Inference over; results saved to results.csv")
-pd.DataFrame(results_rows).to_csv("Data/results.csv", index=True)
 
-snr_improvement = np.array(snr_improvement)
-x = np.arange(len(snr_improvement))
-coeffs = np.polyfit(x, snr_improvement, deg=1)
-trendline = np.polyval(coeffs, x)
+# Save results
+os.makedirs("Data", exist_ok=True)
+pd.DataFrame(results_rows).to_csv("Data/results.csv", index=False)
 
-# # --- Visualization ---
-# plt.figure(figsize=(12, 6))
-
-# # Signal comparison
-# plt.subplot(3, 1, 1)
-# plt.plot(clean_signal_data, label="Clean Signal", color="blue", alpha=0.8)
-# plt.plot(noisy_signal_data, label="Noisy Signal", color="orange", alpha=0.5)
-# plt.plot(filtered_signal_data, label="Filtered Signal", color="green", alpha=0.8)
-# plt.title("Clean vs. Noisy vs. Filtered Signal with SAC")
-# plt.ylabel("Signal Amplitude")
-# plt.legend()
-
-# plt.subplot(3, 1, 2)
-# plt.plot(snr_improvement, label="SNR Improvement", color="red")
-# plt.plot(x, trendline, label="Trendline", color="blue", linestyle='--')
-# plt.axhline(y=0, color='black', linestyle='--')
-# plt.ylabel("SNR Improvement")
-# plt.title("SNR Improvement Over Time")
-# plt.legend()
-
-# # MSE evolution
-# plt.subplot(3, 1, 3)
-# plt.plot(mse, label="MSE (SNR Filtered vs. Raw)", color="blue")
-# plt.xlabel("Time Step")
-# plt.ylabel("MSE")
-# plt.title("MSE Over Time")
-# plt.legend()
-
-# plt.tight_layout()
-# plt.show()
+print("Inference complete. Results saved.")
