@@ -46,6 +46,7 @@ def terminate_process(proc):
 
 
 def save_to_csv(rx_file_path, tx_file_path, csv_file_path):
+    print("in save csv")
     rx_data = np.fromfile(open(rx_file_path), dtype=np.complex64)
     tx_data = np.fromfile(open(tx_file_path), dtype=np.complex64)
 
