@@ -21,20 +21,20 @@ log_path = os.path.join('Training', 'Logs')
 os.makedirs(log_path, exist_ok=True)
 os.makedirs("models", exist_ok=True)
 
-model = SAC("MlpPolicy", env, verbose=1, tensorboard_log=log_path)
+model = SAC("MlpPolicy", env, verbose=1) #tensorboard_log=log_path
 eval_callback = EvalCallback(
     env,
     best_model_save_path='models/best_model',
-    log_path='Training/Logs',
+    #log_path='Training/Logs',
     eval_freq=1000,
     deterministic=True,
     render=False
 )
 checkpoint_callback = CheckpointCallback(save_freq=10000, save_path='models/', name_prefix='sac_checkpoint')
 
-model.learn(total_timesteps=100000, callback=[eval_callback, checkpoint_callback])
+model.learn(total_timesteps=10000, callback=[eval_callback, checkpoint_callback])
 
-model.save("models/sac_noise_reduction")
+model.save("../models/sac_noise_reduction")
 print("Model saved to 'models/sac_noise_reduction'")
 
 mean_reward, std_reward = evaluate_policy(model, env, n_eval_episodes=10, return_episode_rewards=False)
