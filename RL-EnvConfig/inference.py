@@ -123,7 +123,8 @@ for i in range(window_size, len(df)):
         break
 
 env.close()
-pd.DataFrame(results_rows).to_csv("Data/results.csv", index=False)
+print("Inference over; results saved to results.csv")
+pd.DataFrame(results_rows).to_csv("Data/results.csv", index=True)
 
 snr_improvement = np.array(snr_improvement)
 x = np.arange(len(snr_improvement))
