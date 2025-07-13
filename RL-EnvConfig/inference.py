@@ -22,7 +22,12 @@ env = NoiseReductionEnv()
 
 # Parameters
 window_size = 10
-csv_path = "../../Data/signal.csv"
+
+BASE_DIR = "/home/nvidia/Projects/ASTRA/ASTRA-GeneralRepo/"
+DATA_DIR = os.path.join(BASE_DIR, "Scripts/SDR/Data/")
+csv_path = os.path.join(DATA_DIR, "signal.csv")
+
+
 poll_interval = 2      # seconds between polls
 timeout_seconds = 10   # time to wait for new data before exiting
 
@@ -54,6 +59,7 @@ while not done:
         })
     except (pd.errors.EmptyDataError, FileNotFoundError):
         print("signal.csv not ready. Retrying...")
+        print(csv_path)
         time.sleep(poll_interval)
         continue
 
