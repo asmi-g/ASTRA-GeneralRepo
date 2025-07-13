@@ -50,10 +50,10 @@ done = False
 
 print("Waiting for data to appear...")
 
-while not done:
+while (1):
     # Load the latest CSV
     try:
-        df = pd.read_csv(csv_path).rename(columns={
+        df = pd.read_csv(csv_path).tail(500).rename(columns={
             'TX Magnitude': 'Noisy Signal',
             'RX Magnitude': 'Clean Signal'
         })
@@ -139,7 +139,15 @@ while not done:
 
         if done:
             print(f"Early termination signaled by environment at index {i}.")
-            break
+            
+            results_rows.append({
+            "window": f"(DONE)",
+            "action": np.null,
+            "reward": np.null,
+            "snr_improvement": np.null,
+            "threshold_factor": np.null
+            })
+            
 
     time.sleep(poll_interval)
 
