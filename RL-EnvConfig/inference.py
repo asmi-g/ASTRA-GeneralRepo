@@ -8,9 +8,9 @@ import os
 
 # --- Load signal data ---
 #df = pd.read_csv("Data/signal.csv").head(5000).rename(columns={'TX Magnitude': 'Noisy Signal', 'RX Magnitude': 'Clean Signal'})
-#df = pd.read_csv("C:/Users/imanq/Documents/Programs/GitHub/ASTRA-GeneralRepo/Data/simulated_signal_data.csv").head(5000).rename(columns={"TX Magnitude": "Noisy Signal", "RX Magnitude": "Clean Signal"})
+#df = pd.read_csv("Data/simulated_signal_data.csv").head(5000).rename(columns={"TX Magnitude": "Noisy Signal", "RX Magnitude": "Clean Signal"})
 
-csv_path = "Data/signal.csv"
+csv_path = "../../Data/signal.csv"
 
 try:
     df = pd.read_csv(csv_path).head(5000).rename(columns={
@@ -18,11 +18,12 @@ try:
         'RX Magnitude': 'Clean Signal'
     })
 except (pd.errors.EmptyDataError, FileNotFoundError):
-    print("CSV file is missing or empty—generating random fallback data.")
-    df = pd.DataFrame({
-        'Noisy Signal': np.random.normal(0, 1, 20),
-        'Clean Signal': np.random.normal(0, 1, 20)
-    })
+    print("Empty signal.csv")
+    exit()
+
+if len(df) < 10:
+    print("Insufficient data (< 10 data points)")
+    exit()
 
 custom_objects = {
     "lr_schedule": lambda x: 0.003,
@@ -66,6 +67,7 @@ noisy_signal_data = []
 filtered_signal_data = []
 thresholds = []
 mse = []
+results_rows = []
 
 print("Running inference using trained SAC model (continuous actions)...")
 for i in range(window_size, len(df)):
@@ -96,6 +98,14 @@ for i in range(window_size, len(df)):
 
     print(f"Rows {i-window_size, i} | Action: {action} | Reward: {reward:.4f} | SNR Improvement: {snr_improvement[-1]:.2f} | SNR Raw: {snr_raw:.2f} | SNR Filtered: {snr_filtered:.2f} | Done: {done} | filtered signal: {np.mean(filtered_signal):.4f} | clean signal: {np.mean(current_window_clean):.4f} | threshold factor: {t_factor:.4f}")
 
+    results_rows.append({
+        "window": f"({i - window_size}, {i})",
+        "action": action,
+        "reward": reward,
+        "snr_improvement": snr_improvement[-1],
+        "threshold_factor": t_factor
+    })
+
     # Update sliding window
     current_window_clean.pop(0)
     current_window_noisy.pop(0)
@@ -113,6 +123,7 @@ for i in range(window_size, len(df)):
         break
 
 env.close()
+pd.DataFrame(results_rows).to_csv("Data/results.csv", index=False)
 
 snr_improvement = np.array(snr_improvement)
 x = np.arange(len(snr_improvement))
