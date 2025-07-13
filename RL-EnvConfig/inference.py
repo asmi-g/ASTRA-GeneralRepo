@@ -142,10 +142,10 @@ while (1):
             
             results_rows.append({
             "window": f"(DONE)",
-            "action": np.null,
-            "reward": np.null,
-            "snr_improvement": np.null,
-            "threshold_factor": np.null
+            "action": np.NaN,
+            "reward": np.NaN,
+            "snr_improvement": np.NaN,
+            "threshold_factor": np.NaN
             })
             
 
