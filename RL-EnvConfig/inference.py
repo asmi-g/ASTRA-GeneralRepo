@@ -21,7 +21,7 @@ model = SAC.load(model_path, custom_objects=custom_objects)
 env = NoiseReductionEnv()
 
 # Parameters
-window_size = 10
+window_size = 1000
 
 BASE_DIR = "/home/nvidia/Projects/ASTRA/ASTRA-GeneralRepo/"
 DATA_DIR = os.path.join(BASE_DIR, "Scripts/SDR/Data/")
@@ -49,11 +49,12 @@ last_update_time = time.time()
 done = False
 
 print("Waiting for data to appear...")
+counter = 0
 
 while (1):
     # Load the latest CSV
     try:
-        df = pd.read_csv(csv_path).tail(500).rename(columns={
+        df = pd.read_csv(csv_path).rename(columns={
             'TX Magnitude': 'Noisy Signal',
             'RX Magnitude': 'Clean Signal'
         })
@@ -114,7 +115,11 @@ while (1):
         noisy_signal_data.extend(info["noisy_signal"])
         filtered_signal_data.extend(filtered_signal)
 
-        print(f"Rows {i-window_size, i} | Action: {action} | Reward: {reward:.4f} | SNR Improvement: {snr_improvement[-1]:.2f} | SNR Raw: {snr_raw:.2f} | SNR Filtered: {snr_filtered:.2f} | Done: {done} | filtered signal: {np.mean(filtered_signal):.4f} | clean signal: {np.mean(current_window_clean):.4f} | threshold factor: {t_factor:.4f}")
+        if counter == 1000:
+            counter = 0
+            print(f"Rows {i-window_size, i} | Action: {action} | Reward: {reward:.4f} | SNR Improvement: {snr_improvement[-1]:.2f} | SNR Raw: {snr_raw:.2f} | SNR Filtered: {snr_filtered:.2f} | Done: {done} | filtered signal: {np.mean(filtered_signal):.4f} | clean signal: {np.mean(current_window_clean):.4f} | threshold factor: {t_factor:.4f}")
+        else:
+            counter = counter + 1
 
         results_rows.append({
             "window": f"({i - window_size}, {i})",
@@ -139,7 +144,7 @@ while (1):
         last_processed_index += 1
 
         if done:
-            print(f"Early termination signaled by environment at index {i}.")
+            #print(f"Early termination signaled by environment at index {i}.")
             
             results_rows.append({
             "window": f"(DONE)",
