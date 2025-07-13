@@ -29,7 +29,7 @@ csv_path = os.path.join(DATA_DIR, "signal.csv")
 
 
 poll_interval = 2      # seconds between polls
-timeout_seconds = 10   # time to wait for new data before exiting
+timeout_seconds = 120   # time to wait for new data before exiting
 
 # Tracking
 actions = []
@@ -75,6 +75,7 @@ while (1):
             print("No new data detected for timeout period. Exiting.")
             break
         else:
+            print("Waiting for new data...")
             time.sleep(poll_interval)
             continue
 
