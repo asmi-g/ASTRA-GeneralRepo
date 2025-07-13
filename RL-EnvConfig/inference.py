@@ -37,7 +37,10 @@ custom_objects = {
 
 import cloudpickle
 
-with open("models/sac_noise_reduction_py37.pkl", "rb") as f:
+script_dir = os.path.dirname(os.path.abspath(__file__))
+model_path = os.path.join(script_dir, "../models/sac_noise_reduction_py37.pkl")
+
+with open(model_path, "rb") as f:
     model = cloudpickle.load(f)
 
 # Initialize environment
