@@ -30,18 +30,18 @@ custom_objects = {
 }
 
 # Load trained SAC model
-# script_dir = os.path.dirname(os.path.abspath(__file__))
-# model_path = os.path.normpath(os.path.join(script_dir, "../models/sac_noise_reduction_071225_8pm_10k.zip"))
-
-# model = SAC.load(model_path, custom_objects=custom_objects)
-
-import cloudpickle
-
 script_dir = os.path.dirname(os.path.abspath(__file__))
-model_path = os.path.join(script_dir, "../models/sac_noise_reduction_py37.pkl")
+model_path = os.path.normpath(os.path.join(script_dir, "../models/sac_noise_reduction_071225_10pm_10k.zip"))
 
-with open(model_path, "rb") as f:
-    model = cloudpickle.load(f)
+model = SAC.load(model_path, custom_objects=custom_objects)
+
+# import cloudpickle
+
+# script_dir = os.path.dirname(os.path.abspath(__file__))
+# model_path = os.path.join(script_dir, "../models/sac_noise_reduction_py37.pkl")
+
+# with open(model_path, "rb") as f:
+#     model = cloudpickle.load(f)
 
 # Initialize environment
 env = NoiseReductionEnv()
