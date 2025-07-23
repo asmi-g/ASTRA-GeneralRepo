@@ -5,6 +5,8 @@
 
 import time
 import sys
+import os
+
 sys.path.append('/home/nvidia/.local/lib/python3.6/site-packages')
 
 try:
@@ -37,6 +39,7 @@ def log_temperature(log_file, interval=1):
   :param log_file: Path to the log file
   :param interval: Time interval between readings in seconds
   """
+  os.makedirs(os.path.dirname(log_file), exist_ok=True)
   with open(log_file, 'a') as file:
     file.write("Timestamp,Temperature (C)\n")  # Write header
     print("Logging temperature. Press Ctrl+C to stop.")
@@ -58,4 +61,4 @@ def log_temperature(log_file, interval=1):
 # Main function
 if __name__ == "__main__":
   log_interval = 5  # Set logging interval in seconds
-  log_temperature(log_file_path, log_interval)
+  log_temperature(TEMP_LOG_CSV, log_interval)
