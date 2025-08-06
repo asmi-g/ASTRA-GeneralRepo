@@ -1,16 +1,37 @@
 # train_noise_reduction.py
 import time
 start_time = time.time()
+
 import os
 import numpy as np
-import random
 from stable_baselines3 import SAC
 from stable_baselines3.common.env_checker import check_env
 from astra_rev1.envs import NoiseReductionEnv
 from stable_baselines3.common.evaluation import evaluate_policy
-from stable_baselines3.common.callbacks import EvalCallback, CheckpointCallback
+from stable_baselines3.common.callbacks import EvalCallback, CheckpointCallback, CallbackList
 from stable_baselines3.common.monitor import Monitor
+from stable_baselines3.common.logger import configure
+from stable_baselines3.common.callbacks import BaseCallback
 
+# --- Custom Callback to Log Actions ---
+class LogActionCallback(BaseCallback):
+    def __init__(self, verbose=0):
+        super(LogActionCallback, self).__init__(verbose)
+
+    def _on_step(self) -> bool:
+        # Required abstract method — return True to continue training
+        return True
+
+    def _on_rollout_end(self) -> None:
+        try:
+            last_action = self.model._last_obs  # access latest obs to pass to policy
+            action, _ = self.model.predict(last_action, deterministic=False)
+            self.logger.record("train/sample_action", action[0])
+        except Exception as e:
+            if self.verbose > 0:
+                print(f"[LogActionCallback] Failed to record action: {e}")
+
+# --- Setup ---
 env = Monitor(NoiseReductionEnv())
 check_env(env, warn=True)
 
@@ -21,30 +42,51 @@ log_path = os.path.join('Training', 'Logs')
 os.makedirs(log_path, exist_ok=True)
 os.makedirs("models", exist_ok=True)
 
-model = SAC("MlpPolicy", env, verbose=1) #tensorboard_log=log_path
+# --- Create Model with TensorBoard Logging ---
+model = SAC("MlpPolicy", env, verbose=1, tensorboard_log=log_path, ent_coef="auto_0.1")
+
+# --- Callbacks ---
 eval_callback = EvalCallback(
     env,
     best_model_save_path='models/best_model',
-    #log_path='Training/Logs',
     eval_freq=1000,
     deterministic=True,
     render=False
 )
-checkpoint_callback = CheckpointCallback(save_freq=10000, save_path='models/', name_prefix='sac_checkpoint')
 
-model.learn(total_timesteps=10000, callback=[eval_callback, checkpoint_callback])
+checkpoint_callback = CheckpointCallback(
+    save_freq=10000,
+    save_path='models/',
+    name_prefix='sac_checkpoint'
+)
 
-model.save("../models/sac_noise_reduction")
-print("Model saved to 'models/sac_noise_reduction'")
+log_action_callback = LogActionCallback(verbose=1)
 
+callback = CallbackList([
+    eval_callback,
+    checkpoint_callback,
+    log_action_callback
+])
+
+# --- Train ---
+model.learn(total_timesteps=50000, callback=callback)
+
+# --- Save Model ---
+model_name = f"sac_noise_reduction_{start_time}"
+model.save(os.path.join("models", model_name))
+print(f"Model saved to 'models/{model_name}'")
+
+# --- Final Evaluation ---
 mean_reward, std_reward = evaluate_policy(model, env, n_eval_episodes=10, return_episode_rewards=False)
-print(f"Mean reward: {mean_reward} ± {std_reward}")
+print(f"Mean reward: {mean_reward:.2f} ± {std_reward:.2f}")
 
 episode_rewards = evaluate_policy(model, env, n_eval_episodes=10, return_episode_rewards=True)
 print("Evaluation rewards over episodes: ", episode_rewards)
-end_time = time.time()
-elapsed_time = end_time - start_time
+
+elapsed_time = time.time() - start_time
 print(f"\nTotal runtime: {elapsed_time:.2f} seconds")
+
+
 
 
 

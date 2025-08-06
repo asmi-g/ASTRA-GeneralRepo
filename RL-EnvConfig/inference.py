@@ -14,7 +14,7 @@ custom_objects = {
 }
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
-model_path = os.path.normpath(os.path.join(script_dir, "../models/sac_noise_reduction_071225_10pm_10k.zip"))
+model_path = os.path.normpath(os.path.join(script_dir, "../models/sac_noise_reduction_080625_4am.zip"))
 model = SAC.load(model_path, custom_objects=custom_objects)
 
 # Initialize environment
@@ -26,7 +26,7 @@ window_size = 10
 BASE_DIR = "/home/nvidia/Projects/ASTRA/ASTRA-GeneralRepo/"
 DATA_DIR = os.path.join(BASE_DIR, "Scripts/SDR/Data/")
 csv_path = os.path.join(DATA_DIR, "signal.csv")
-
+csv_path = os.path.normpath(os.path.join(script_dir, "../Data/simulated_signal_data.csv"))
 
 poll_interval = 2      # seconds between polls
 timeout_seconds = 10   # time to wait for new data before exiting
@@ -53,7 +53,7 @@ print("Waiting for data to appear...")
 while (1):
     # Load the latest CSV
     try:
-        df = pd.read_csv(csv_path).tail(500).rename(columns={
+        df = pd.read_csv(csv_path).head(500).rename(columns={
             'TX Magnitude': 'Noisy Signal',
             'RX Magnitude': 'Clean Signal'
         })
@@ -109,8 +109,8 @@ while (1):
         snr_improvement.append(snr_filtered_list[-1] - snr_raw_list[-1])
         mse.append(np.square(np.subtract(snr_filtered, snr_raw)).mean())
 
-        clean_signal_data.extend(info["clean_signal"])
-        noisy_signal_data.extend(info["noisy_signal"])
+        clean_signal_data.extend(current_window_clean)
+        noisy_signal_data.extend(current_window_noisy)
         filtered_signal_data.extend(filtered_signal)
 
         print(f"Rows {i-window_size, i} | Action: {action} | Reward: {reward:.4f} | SNR Improvement: {snr_improvement[-1]:.2f} | SNR Raw: {snr_raw:.2f} | SNR Filtered: {snr_filtered:.2f} | Done: {done} | filtered signal: {np.mean(filtered_signal):.4f} | clean signal: {np.mean(current_window_clean):.4f} | threshold factor: {t_factor:.4f}")
@@ -155,6 +155,50 @@ env.close()
 
 # Save results
 os.makedirs("Data", exist_ok=True)
-pd.DataFrame(results_rows).to_csv("Data/results.csv", index=False)
+#pd.DataFrame(results_rows).to_csv("Data/results.csv", index=False)
 
 print("Inference complete. Results saved.")
+
+
+snr_improvement = np.array(snr_improvement)
+x = np.arange(len(snr_improvement))
+coeffs = np.polyfit(x, snr_improvement, deg=1)
+trendline = np.polyval(coeffs, x)
+
+# --- Visualization ---
+plt.figure(figsize=(12, 6))
+
+# Signal comparison
+plt.subplot(3, 1, 1)
+plt.plot(clean_signal_data, label="Clean Signal", color="blue", alpha=0.8)
+plt.plot(noisy_signal_data, label="Noisy Signal", color="orange", alpha=0.5)
+plt.plot(filtered_signal_data, label="Filtered Signal", color="green", alpha=0.8)
+plt.title("Clean vs. Noisy vs. Filtered Signal with SAC")
+plt.ylabel("Signal Amplitude")
+plt.legend()
+
+plt.subplot(3, 1, 2)
+plt.plot(snr_improvement, label="SNR Improvement", color="red")
+plt.plot(x, trendline, label="Trendline", color="blue", linestyle='--')
+plt.axhline(y=0, color='black', linestyle='--')
+plt.ylabel("SNR Improvement")
+plt.title("SNR Improvement Over Time")
+plt.legend()
+
+# # MSE evolution
+# plt.subplot(3, 1, 3)
+# plt.plot(mse, label="MSE (SNR Filtered vs. Raw)", color="blue")
+# plt.xlabel("Time Step")
+# plt.ylabel("MSE")
+# plt.title("MSE Over Time")
+# plt.legend()
+
+plt.subplot(3, 1, 3)
+plt.plot(thresholds, label="Threshold over time", color="blue")
+plt.xlabel("Time Step")
+plt.ylabel("Threshold")
+plt.title("Threshold Over Time")
+plt.legend()
+
+plt.tight_layout()
+plt.show()
