@@ -126,11 +126,12 @@ class StatelessDenoisingEnv(gym.Env):
             snr_filtered = self._snr(clean_window, filtered_window)
             snr_improvement = snr_filtered - snr_raw
             signal_loss = np.mean((filtered_window - clean_window)**2)
+            reward = snr_improvement - 0.1 * signal_loss
 
             # Normalize signal_loss to avoid overpowering SNR term
-            loss_penalty = min(signal_loss / 1000.0, 2.0)  # Cap the penalty to avoid large swings
+            # loss_penalty = min(signal_loss / 1000.0, 2.0)
 
-            reward = snr_improvement - np.sqrt(signal_loss)
+            # reward = snr_improvement - np.sqrt(signal_loss)
 
         else:
             snr_raw = None
