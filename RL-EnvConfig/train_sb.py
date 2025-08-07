@@ -1,54 +1,75 @@
 # train_noise_reduction.py
+# train_noise_reduction.py
 import time
-start_time = time.time()
-
 import os
 import numpy as np
+
 from stable_baselines3 import SAC
 from stable_baselines3.common.env_checker import check_env
-from astra_rev1.envs import NoiseReductionEnv
 from stable_baselines3.common.evaluation import evaluate_policy
-from stable_baselines3.common.callbacks import EvalCallback, CheckpointCallback, CallbackList
+from stable_baselines3.common.callbacks import EvalCallback, CheckpointCallback, CallbackList, BaseCallback
 from stable_baselines3.common.monitor import Monitor
-from stable_baselines3.common.logger import configure
-from stable_baselines3.common.callbacks import BaseCallback
 
-# --- Custom Callback to Log Actions ---
+from astra_rev1.envs import NoiseReductionEnv
+
+# -------------------------------
+# Setup
+# -------------------------------
+start_time = time.time()
+seed = 42
+np.random.seed(seed)
+
+log_path = os.path.join("Training", "Logs")
+model_dir = "models"
+best_model_dir = os.path.join(model_dir, "best_model")
+
+os.makedirs(log_path, exist_ok=True)
+os.makedirs(model_dir, exist_ok=True)
+os.makedirs(best_model_dir, exist_ok=True)
+
+# -------------------------------
+# Custom Callback to Log Sample Action
+# -------------------------------
 class LogActionCallback(BaseCallback):
     def __init__(self, verbose=0):
-        super(LogActionCallback, self).__init__(verbose)
+        super().__init__(verbose)
 
     def _on_step(self) -> bool:
-        # Required abstract method — return True to continue training
         return True
 
     def _on_rollout_end(self) -> None:
         try:
-            last_action = self.model._last_obs  # access latest obs to pass to policy
-            action, _ = self.model.predict(last_action, deterministic=False)
-            self.logger.record("train/sample_action", action[0])
+            last_obs = self.model._last_obs
+            action, _ = self.model.predict(last_obs, deterministic=False)
+            self.logger.record("train/sample_action", float(action[0]))
         except Exception as e:
-            if self.verbose > 0:
+            if self.verbose:
                 print(f"[LogActionCallback] Failed to record action: {e}")
 
-# --- Setup ---
+# -------------------------------
+# Initialize Environment
+# -------------------------------
 env = Monitor(NoiseReductionEnv())
 check_env(env, warn=True)
 
-seed = 42
-np.random.seed(seed)
+# -------------------------------
+# Create Model
+# -------------------------------
+model = SAC(
+    policy="MlpPolicy",
+    env=env,
+    verbose=1,
+    tensorboard_log=log_path,
+    seed=seed,
+    ent_coef="auto_0.5"
+)
 
-log_path = os.path.join('Training', 'Logs')
-os.makedirs(log_path, exist_ok=True)
-os.makedirs("models", exist_ok=True)
-
-# --- Create Model with TensorBoard Logging ---
-model = SAC("MlpPolicy", env, verbose=1, tensorboard_log=log_path, ent_coef="auto_0.1")
-
-# --- Callbacks ---
+# -------------------------------
+# Callbacks
+# -------------------------------
 eval_callback = EvalCallback(
     env,
-    best_model_save_path='models/best_model',
+    best_model_save_path=best_model_dir,
     eval_freq=1000,
     deterministic=True,
     render=False
@@ -56,8 +77,8 @@ eval_callback = EvalCallback(
 
 checkpoint_callback = CheckpointCallback(
     save_freq=10000,
-    save_path='models/',
-    name_prefix='sac_checkpoint'
+    save_path=model_dir,
+    name_prefix="sac_checkpoint"
 )
 
 log_action_callback = LogActionCallback(verbose=1)
@@ -68,29 +89,35 @@ callback = CallbackList([
     log_action_callback
 ])
 
-# --- Train ---
+# -------------------------------
+# Train
+# -------------------------------
 model.learn(total_timesteps=50000, callback=callback)
 
-# --- Save Model ---
-model_name = f"sac_noise_reduction_{start_time}"
-model.save(os.path.join("models", model_name))
-print(f"Model saved to 'models/{model_name}'")
+# -------------------------------
+# Save Model
+# -------------------------------
+model_name = f"sac_noise_reduction_{int(start_time)}"
+model_path = os.path.join(model_dir, model_name)
+model.save(model_path)
+print(f"\n Model saved to: {model_path}")
 
-# --- Final Evaluation ---
-mean_reward, std_reward = evaluate_policy(model, env, n_eval_episodes=10, return_episode_rewards=False)
-print(f"Mean reward: {mean_reward:.2f} ± {std_reward:.2f}")
+# -------------------------------
+# Evaluate
+# -------------------------------
+env.reset()
+mean_reward, std_reward = evaluate_policy(model, env, n_eval_episodes=10)
+print(f"Final Evaluation: Mean Reward = {mean_reward:.2f} ± {std_reward:.2f}")
 
 episode_rewards = evaluate_policy(model, env, n_eval_episodes=10, return_episode_rewards=True)
-print("Evaluation rewards over episodes: ", episode_rewards)
+print("Per-Episode Rewards:", episode_rewards)
 
+# -------------------------------
+# Cleanup
+# -------------------------------
+env.close()
 elapsed_time = time.time() - start_time
-print(f"\nTotal runtime: {elapsed_time:.2f} seconds")
-
-
-
-
-
-
+print(f"\n Total Runtime: {elapsed_time:.2f} seconds")
 
 # 
 # def generate_synthetic_signal(signal_type=None, noise_level=None, length=100):

@@ -14,7 +14,7 @@ class NoiseReductionEnv(gym.Env):
         self.action_space = self.denoiser.action_space
 
     def reset(self, clean_signal=None, noisy_signal=None):
-        self.signal_length = np.random.randint(200, 10000)
+        self.signal_length = np.random.randint(2000, 10000)
         if clean_signal is not None and noisy_signal is not None:
             self.clean = clean_signal.astype(np.float64)
             self.noisy = noisy_signal.astype(np.float64)
@@ -81,15 +81,19 @@ class NoiseReductionEnv(gym.Env):
         noisy_window = self.noisy[self.t:self.t+self.window_size]
 
         _, reward, _, info = self.denoiser.step(noisy_window, action, clean_window)
-        #self.t += 1
+        #self.t += 1 #have to comment this out nduring inference.py
         self.reward_history.append(reward)
         
         done = False
-        # if len(self.reward_history) > 100:
-        #     recent_rewards = self.reward_history[-10:]
-        #     std_dev = np.std(recent_rewards)
-        #     if std_dev < 1e-4:
-        #         done = True
+        if len(self.reward_history) > 100:
+            recent_rewards = self.reward_history[-10:]
+            std_dev = np.std(recent_rewards)
+            if std_dev < 1e-17:
+                print(f"std: {std_dev}. threshold = {std_dev < 1e-20}")
+                done = True
+        # if self.t + self.window_size >= len(self.noisy): # comment this out too during inference.py
+        #     done = True
+
 
         return self._get_state(), reward, done, info
 
@@ -125,14 +129,20 @@ class StatelessDenoisingEnv(gym.Env):
             snr_raw = self._snr(clean_window, window)
             snr_filtered = self._snr(clean_window, filtered_window)
             snr_improvement = snr_filtered - snr_raw
-            signal_loss = np.mean((filtered_window - clean_window)**2)
-            reward = snr_improvement - 0.1 * signal_loss
+            signal_loss = np.log1p(np.mean((filtered_window - clean_window)**2))
+            normalized_loss = signal_loss / (np.max(clean_window)**2 + 1e-6)
 
-            # Normalize signal_loss to avoid overpowering SNR term
-            # loss_penalty = min(signal_loss / 1000.0, 2.0)
+            correlation = np.corrcoef(filtered_window, clean_window)[0, 1]
+            if np.isnan(correlation):
+                correlation = 0.0
 
-            # reward = snr_improvement - np.sqrt(signal_loss)
+            reward = (
+                1 * snr_improvement
+                - 1.5 * normalized_loss
+                + 0.75 * correlation
+            )
 
+            #reward = 1.5 * snr_improvement - 0.75 * signal_loss + 0.5 * correlation
         else:
             snr_raw = None
             snr_filtered = None

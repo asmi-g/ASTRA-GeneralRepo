@@ -14,7 +14,7 @@ custom_objects = {
 }
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
-model_path = os.path.normpath(os.path.join(script_dir, "../models/sac_noise_reduction_080625_4am.zip"))
+model_path = os.path.normpath(os.path.join(script_dir, "../models/sac_noise_reduction_080725_3am.zip"))
 model = SAC.load(model_path, custom_objects=custom_objects)
 
 # Initialize environment
@@ -53,7 +53,7 @@ print("Waiting for data to appear...")
 while (1):
     # Load the latest CSV
     try:
-        df = pd.read_csv(csv_path).head(500).rename(columns={
+        df = pd.read_csv(csv_path).head(1000).rename(columns={
             'TX Magnitude': 'Noisy Signal',
             'RX Magnitude': 'Clean Signal'
         })
